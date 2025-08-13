@@ -1,0 +1,83 @@
+name: Go SLSA Generic Build
+
+on:
+  push:
+    tags:
+      - 'go-v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to generate provenance for (e.g., go-v1.0.2)'
+        required: true
+        default: 'go-v1.0.2'
+
+permissions: read-all
+
+jobs:
+  # Build Go binary first
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      hashes: ${{ steps.hash.outputs.hashes }}
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event.inputs.tag || github.ref }}
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+
+    - name: Build Go binaries
+      run: |
+        echo "📦 Building Go binaries for multiple platforms..."
+        
+        # Build for Linux AMD64
+        GOOS=linux GOARCH=amd64 go build -o zobra-go-linux-amd64 main.go
+        
+        # Build for Linux ARM64
+        GOOS=linux GOARCH=arm64 go build -o zobra-go-linux-arm64 main.go
+        
+        # Build for macOS AMD64
+        GOOS=darwin GOARCH=amd64 go build -o zobra-go-darwin-amd64 main.go
+        
+        # Build for macOS ARM64 (Apple Silicon)
+        GOOS=darwin GOARCH=arm64 go build -o zobra-go-darwin-arm64 main.go
+        
+        # Build for Windows AMD64
+        GOOS=windows GOARCH=amd64 go build -o zobra-go-windows-amd64.exe main.go
+        
+        echo "✅ Built binaries:"
+        ls -la zobra-go-*
+
+    - name: Generate subject hashes
+      id: hash
+      run: |
+        set -euo pipefail
+        echo "🔍 Generating hashes for all binaries..."
+        echo "hashes=$(sha256sum zobra-go-* | base64 -w0)" >> "$GITHUB_OUTPUT"
+        echo "📋 Generated hashes:"
+        sha256sum zobra-go-*
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: zobra-go-binaries
+        path: zobra-go-*
+
+  # Generate SLSA provenance using the generic generator (same as Python)
+  provenance:
+    needs: [build]
+    permissions:
+      actions: read   # To read the workflow path.
+      id-token: write # To sign the provenance.
+      contents: write # To add assets to a release.
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.1.0
+    with:
+      base64-subjects: "${{ needs.build.outputs.hashes }}"
+      upload-assets: true
+      upload-tag-name: ${{ github.event.inputs.tag || github.ref_name }}
+      provenance-name: "zobra-go-generic-provenance.intoto.jsonl"
