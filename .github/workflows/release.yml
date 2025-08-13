@@ -1,0 +1,52 @@
+name: Release with SLSA Provenance
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to generate provenance for'
+        required: true
+        default: 'v0.1.0'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event.inputs.tag || github.ref }}
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install build
+
+    - name: Build package
+      run: python -m build
+
+    - name: Generate artifact attestations
+      uses: actions/attest-build-provenance@v2
+      with:
+        subject-path: 'dist/*'
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: zobra-dist
+        path: dist/

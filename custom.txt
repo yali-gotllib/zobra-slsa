@@ -1,0 +1,7 @@
+Hello from Zobra!
+
+This is a custom file created for SLSA demonstration.
+It shows how zobra can create files with specific content.
+
+SLSA helps secure the software supply chain by providing
+provenance information about how software artifacts were built.

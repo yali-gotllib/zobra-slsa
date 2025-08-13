@@ -1,0 +1,17 @@
+# File created by zobra package
+# Filename: foo.txt
+# Created: 2025-08-11T20:00:29.677476
+# Package: zobra v0.1.0
+# Purpose: SLSA provenance demonstration
+
+This file was created by the zobra Python package as part of a 
+Supply-chain Levels for Software Artifacts (SLSA) demonstration.
+
+Zobra is a simple package designed to showcase:
+- Package creation and distribution
+- SLSA provenance generation
+- Provenance verification workflows
+
+For more information about SLSA, visit: https://slsa.dev/
+
+Generated at: 2025-08-11T20:00:29.677476

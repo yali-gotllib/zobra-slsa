@@ -1,0 +1,11 @@
+LICENSE
+README.md
+pyproject.toml
+tests/test_zobra.py
+zobra/__init__.py
+zobra/core.py
+zobra.egg-info/PKG-INFO
+zobra.egg-info/SOURCES.txt
+zobra.egg-info/dependency_links.txt
+zobra.egg-info/requires.txt
+zobra.egg-info/top_level.txt

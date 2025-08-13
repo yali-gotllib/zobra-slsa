@@ -1,0 +1,135 @@
+Metadata-Version: 2.4
+Name: zobra
+Version: 0.1.0
+Summary: A simple Python package for SLSA provenance demonstration
+Author-email: Wiz Security <security@wiz.io>
+License-Expression: MIT
+Project-URL: Homepage, https://github.com/wiz-sec/zobra
+Project-URL: Repository, https://github.com/wiz-sec/zobra
+Project-URL: Issues, https://github.com/wiz-sec/zobra/issues
+Keywords: slsa,provenance,security,supply-chain
+Classifier: Development Status :: 3 - Alpha
+Classifier: Intended Audience :: Developers
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Provides-Extra: dev
+Requires-Dist: pytest>=6.0; extra == "dev"
+Requires-Dist: pytest-cov>=2.0; extra == "dev"
+Requires-Dist: black>=21.0; extra == "dev"
+Requires-Dist: flake8>=3.8; extra == "dev"
+Requires-Dist: mypy>=0.900; extra == "dev"
+Dynamic: license-file
+
+# Zobra
+
+A simple Python package for SLSA (Supply-chain Levels for Software Artifacts) provenance demonstration.
+
+## Overview
+
+Zobra is a minimal Python package created to demonstrate SLSA provenance generation and verification workflows. It provides basic file operations that can be used to showcase supply chain security practices.
+
+## Installation
+
+### From Source
+
+```bash
+git clone https://github.com/wiz-sec/zobra.git
+cd zobra
+pip install -e .
+```
+
+### For Development
+
+```bash
+git clone https://github.com/wiz-sec/zobra.git
+cd zobra
+pip install -e ".[dev]"
+```
+
+## Usage
+
+### Basic Usage
+
+```python
+import zobra
+
+# Create a file with default content
+zobra.dump_file('foo.txt')
+
+# Create a file with custom content
+zobra.dump_file('custom.txt', 'Hello, SLSA!')
+
+# Read a file
+content = zobra.read_file('foo.txt')
+print(content)
+
+# Get package version
+version = zobra.get_version()
+print(f"Zobra version: {version}")
+```
+
+### Command Line Usage
+
+After installation, you can also use zobra from the command line:
+
+```bash
+python -c "import zobra; zobra.dump_file('example.txt')"
+```
+
+## SLSA Demonstration Scenarios
+
+This package is designed to support the following SLSA demonstration scenarios:
+
+1. **Create package + verify**: Generate SLSA provenance and verify with slsa-verifier
+2. **Existing package + has SLSA + verify succeeds**: Demonstrate successful verification
+3. **Existing package + no SLSA + verify failed**: Show verification failure without provenance
+4. **Create package with broken SLSA + verify failed**: Demonstrate verification failure with invalid provenance
+
+## Features
+
+- Simple file creation with `dump_file()`
+- File reading with `read_file()`
+- Version information retrieval
+- Automatic timestamp and metadata inclusion
+- Type hints for better development experience
+- Comprehensive error handling
+
+## Development
+
+### Running Tests
+
+```bash
+pytest
+```
+
+### Code Formatting
+
+```bash
+black zobra/
+```
+
+### Type Checking
+
+```bash
+mypy zobra/
+```
+
+## License
+
+MIT License - see LICENSE file for details.
+
+## Contributing
+
+This is a demonstration package for SLSA provenance workflows. Contributions are welcome for educational purposes.
+
+## About SLSA
+
+SLSA (Supply-chain Levels for Software Artifacts) is a security framework that helps protect software supply chains. Learn more at [slsa.dev](https://slsa.dev/).
