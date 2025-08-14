@@ -25,5 +25,6 @@ jobs:
     with:
       image: ghcr.io/yali-gotllib/zobra-slsa
       registry-username: ${{ github.actor }}
+      tag: ${{ github.event.inputs.tag || github.ref_name }}
     secrets:
       registry-password: ${{ secrets.GITHUB_TOKEN }}
