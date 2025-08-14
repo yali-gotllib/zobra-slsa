@@ -1,0 +1,29 @@
+name: Container SLSA Build
+
+on:
+  push:
+    tags:
+      - 'container-v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to generate provenance for (e.g., container-v1.0.0)'
+        required: true
+        default: 'container-v1.0.0'
+
+permissions: read-all
+
+jobs:
+  # Build and push container image with SLSA provenance
+  build:
+    permissions:
+      contents: read
+      packages: write
+      id-token: write # For signing
+      actions: read
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v2.1.0
+    with:
+      image: ghcr.io/yali-gotllib/zobra-slsa
+      registry-username: ${{ github.actor }}
+    secrets:
+      registry-password: ${{ secrets.GITHUB_TOKEN }}
