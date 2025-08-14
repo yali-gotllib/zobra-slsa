@@ -1,0 +1,212 @@
+name: Generic SLSA Provenance
+
+on:
+  push:
+    tags:
+      - 'v*'
+      - 'go-v*'
+      - 'py-v*'
+      - 'node-v*'
+  workflow_dispatch:
+    inputs:
+      artifact_type:
+        description: 'Type of artifact to build (auto, go, python, nodejs, generic)'
+        required: false
+        default: 'auto'
+        type: choice
+        options:
+          - auto
+          - go
+          - python
+          - nodejs
+          - generic
+      tag:
+        description: 'Tag to generate provenance for'
+        required: false
+        default: ''
+      build_command:
+        description: 'Custom build command (for generic type)'
+        required: false
+        default: ''
+      artifact_pattern:
+        description: 'Pattern to match artifacts (for generic type)'
+        required: false
+        default: '*'
+
+permissions: read-all
+
+jobs:
+  # Detect project type and configure build parameters
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      artifact_type: ${{ steps.detect.outputs.artifact_type }}
+      build_command: ${{ steps.detect.outputs.build_command }}
+      setup_command: ${{ steps.detect.outputs.setup_command }}
+      artifact_pattern: ${{ steps.detect.outputs.artifact_pattern }}
+      artifact_path: ${{ steps.detect.outputs.artifact_path }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Detect project type and configure build
+        id: detect
+        run: |
+          set -euo pipefail
+          
+          # Use manual input if provided
+          if [ "${{ github.event.inputs.artifact_type }}" != "auto" ] && [ "${{ github.event.inputs.artifact_type }}" != "" ]; then
+            ARTIFACT_TYPE="${{ github.event.inputs.artifact_type }}"
+            echo "🎯 Using manual artifact type: $ARTIFACT_TYPE"
+          else
+            # Auto-detect based on files present
+            echo "🔍 Auto-detecting project type..."
+            
+            if [ -f "go.mod" ]; then
+              ARTIFACT_TYPE="go"
+              echo "📦 Detected Go project (go.mod found)"
+            elif [ -f "pyproject.toml" ] || [ -f "setup.py" ] || [ -f "setup.cfg" ]; then
+              ARTIFACT_TYPE="python"
+              echo "🐍 Detected Python project (pyproject.toml/setup.py found)"
+            elif [ -f "package.json" ]; then
+              ARTIFACT_TYPE="nodejs"
+              echo "📦 Detected Node.js project (package.json found)"
+            else
+              ARTIFACT_TYPE="generic"
+              echo "❓ No specific project type detected, using generic"
+            fi
+          fi
+          
+          # Configure build parameters based on type
+          case "$ARTIFACT_TYPE" in
+            "go")
+              echo "setup_command=echo 'Setting up Go...'" >> "$GITHUB_OUTPUT"
+              echo "build_command=go build -o zobra-go-linux-amd64 main.go && GOOS=darwin GOARCH=amd64 go build -o zobra-go-darwin-amd64 main.go && GOOS=windows GOARCH=amd64 go build -o zobra-go-windows-amd64.exe main.go" >> "$GITHUB_OUTPUT"
+              echo "artifact_pattern=zobra-go-*" >> "$GITHUB_OUTPUT"
+              echo "artifact_path=." >> "$GITHUB_OUTPUT"
+              ;;
+            "python")
+              echo "setup_command=python -m pip install --upgrade pip && pip install build" >> "$GITHUB_OUTPUT"
+              echo "build_command=python -m build" >> "$GITHUB_OUTPUT"
+              echo "artifact_pattern=*" >> "$GITHUB_OUTPUT"
+              echo "artifact_path=dist" >> "$GITHUB_OUTPUT"
+              ;;
+            "nodejs")
+              echo "setup_command=npm install" >> "$GITHUB_OUTPUT"
+              echo "build_command=npm run build && npm pack" >> "$GITHUB_OUTPUT"
+              echo "artifact_pattern=*.tgz" >> "$GITHUB_OUTPUT"
+              echo "artifact_path=." >> "$GITHUB_OUTPUT"
+              ;;
+            "generic")
+              BUILD_CMD="${{ github.event.inputs.build_command }}"
+              PATTERN="${{ github.event.inputs.artifact_pattern }}"
+              echo "setup_command=echo 'Generic setup - no specific setup required'" >> "$GITHUB_OUTPUT"
+              echo "build_command=${BUILD_CMD:-echo 'No build command specified'}" >> "$GITHUB_OUTPUT"
+              echo "artifact_pattern=${PATTERN:-*}" >> "$GITHUB_OUTPUT"
+              echo "artifact_path=." >> "$GITHUB_OUTPUT"
+              ;;
+          esac
+          
+          echo "artifact_type=$ARTIFACT_TYPE" >> "$GITHUB_OUTPUT"
+          echo "✅ Configuration complete for $ARTIFACT_TYPE"
+
+  # Build artifacts based on detected/specified type
+  build:
+    needs: [detect]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      hashes: ${{ steps.hash.outputs.hashes }}
+      artifact_type: ${{ needs.detect.outputs.artifact_type }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      # Setup environment based on artifact type
+      - name: Setup Go
+        if: needs.detect.outputs.artifact_type == 'go'
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+
+      - name: Setup Python
+        if: needs.detect.outputs.artifact_type == 'python'
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Setup Node.js
+        if: needs.detect.outputs.artifact_type == 'nodejs'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      # Run setup commands
+      - name: Setup dependencies
+        run: |
+          echo "🔧 Running setup for ${{ needs.detect.outputs.artifact_type }}..."
+          ${{ needs.detect.outputs.setup_command }}
+
+      # Build artifacts
+      - name: Build artifacts
+        run: |
+          echo "🏗️ Building artifacts for ${{ needs.detect.outputs.artifact_type }}..."
+          ${{ needs.detect.outputs.build_command }}
+          
+          echo "📦 Built artifacts:"
+          if [ "${{ needs.detect.outputs.artifact_path }}" != "." ]; then
+            ls -la "${{ needs.detect.outputs.artifact_path }}/" || echo "No artifacts in specified path"
+          else
+            ls -la ${{ needs.detect.outputs.artifact_pattern }} || echo "No artifacts matching pattern"
+          fi
+
+      # Generate hashes for SLSA provenance
+      - name: Generate subject hashes
+        id: hash
+        run: |
+          set -euo pipefail
+          echo "🔍 Generating hashes for SLSA provenance..."
+          
+          cd "${{ needs.detect.outputs.artifact_path }}"
+          
+          # Check if any files match the pattern
+          if ! ls ${{ needs.detect.outputs.artifact_pattern }} >/dev/null 2>&1; then
+            echo "❌ No artifacts found matching pattern: ${{ needs.detect.outputs.artifact_pattern }}"
+            echo "📁 Contents of ${{ needs.detect.outputs.artifact_path }}:"
+            ls -la
+            exit 1
+          fi
+          
+          echo "📋 Generating hashes for:"
+          ls -la ${{ needs.detect.outputs.artifact_pattern }}
+          
+          # Generate base64-encoded hashes as required by SLSA
+          echo "hashes=$(sha256sum ${{ needs.detect.outputs.artifact_pattern }} | base64 -w0)" >> "$GITHUB_OUTPUT"
+          
+          echo "✅ Hash generation complete"
+          echo "📊 Generated hashes:"
+          sha256sum ${{ needs.detect.outputs.artifact_pattern }}
+
+      # Upload artifacts for later verification
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: generic-slsa-artifacts-${{ needs.detect.outputs.artifact_type }}
+          path: ${{ needs.detect.outputs.artifact_path }}/${{ needs.detect.outputs.artifact_pattern }}
+
+  # Generate SLSA provenance using the official generic generator
+  provenance:
+    needs: [build]
+    permissions:
+      actions: read   # To read the workflow path
+      id-token: write # To sign the provenance
+      contents: write # To add assets to a release
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.1.0
+    with:
+      base64-subjects: "${{ needs.build.outputs.hashes }}"
+      upload-assets: true
+      upload-tag-name: ${{ github.event.inputs.tag || github.ref_name }}
+      provenance-name: "generic-slsa-provenance-${{ needs.build.outputs.artifact_type }}.intoto.jsonl"

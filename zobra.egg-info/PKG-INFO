@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: zobra
-Version: 0.1.0
+Version: 0.1.4
 Summary: A simple Python package for SLSA provenance demonstration
 Author-email: Wiz Security <security@wiz.io>
 License-Expression: MIT
@@ -84,14 +84,60 @@ After installation, you can also use zobra from the command line:
 python -c "import zobra; zobra.dump_file('example.txt')"
 ```
 
-## SLSA Demonstration Scenarios
+## 🔒 SLSA Security Implementation
 
-This package is designed to support the following SLSA demonstration scenarios:
+This package demonstrates **SLSA Level 3** provenance generation using GitHub's native attestation system.
 
-1. **Create package + verify**: Generate SLSA provenance and verify with slsa-verifier
-2. **Existing package + has SLSA + verify succeeds**: Demonstrate successful verification
-3. **Existing package + no SLSA + verify failed**: Show verification failure without provenance
-4. **Create package with broken SLSA + verify failed**: Demonstrate verification failure with invalid provenance
+### Verification
+
+Verify the package integrity using GitHub CLI:
+
+```bash
+# Download the package
+pip download zobra --no-deps
+
+# Verify SLSA attestation
+gh attestation verify zobra-*.whl --repo wiz-sec/zobra
+```
+
+### Comprehensive Verification
+
+Run our complete verification script:
+
+```bash
+./verify_slsa_complete.sh
+```
+
+### SLSA Demonstration Scenarios
+
+This package supports the following SLSA demonstration scenarios:
+
+1. **✅ Create package + verify**: Generate SLSA provenance for zobra and verify with GitHub CLI
+2. **✅ Existing package + has SLSA + verify succeeds**: Verify third-party package (Argo CD) with official slsa-verifier
+3. **✅ Existing package + no SLSA + verify failed**: Show verification failure without provenance
+4. **✅ Create package with broken SLSA + verify failed**: Demonstrate verification failure with invalid provenance
+
+### Complete Scenario Testing
+
+Run all scenarios with our comprehensive demonstration script:
+
+```bash
+./demo_all_slsa_scenarios.sh
+```
+
+This script tests:
+- **Scenario 1**: Our zobra package with GitHub attestations
+- **Scenario 2**: Argo CD CLI with official SLSA framework verification
+- **Scenario 3**: Dummy package without provenance (correctly fails)
+- **Scenario 4**: Package with corrupted provenance (correctly fails)
+
+### Security Properties
+
+Our implementation provides:
+- **Build Integrity**: Cryptographic proof of build process
+- **Source Authenticity**: Verification of source repository
+- **Transparency**: Public record in Rekor transparency log
+- **Non-Repudiation**: Immutable build attestation
 
 ## Features
 
@@ -129,6 +175,12 @@ MIT License - see LICENSE file for details.
 ## Contributing
 
 This is a demonstration package for SLSA provenance workflows. Contributions are welcome for educational purposes.
+
+## 📚 Documentation
+
+- **[SLSA Implementation Details](SLSA_IMPLEMENTATION.md)** - Comprehensive guide to our SLSA setup
+- **[Release Process](create_release.md)** - How to create releases with SLSA provenance
+- **[Verification Scripts](verify_slsa_complete.sh)** - Complete verification workflow
 
 ## About SLSA
 
