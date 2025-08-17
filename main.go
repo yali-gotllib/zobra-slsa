@@ -4,16 +4,18 @@ import (
 	"fmt"
 	"os"
 	"time"
+
+	"github.com/fatih/color"
 )
 
 const version = "v1.0.0"
 
 func main() {
-	fmt.Printf("🎯 Zobra Go - SLSA Demonstration Package %s\n", version)
-	fmt.Printf("📅 Built at: %s\n", time.Now().Format(time.RFC3339))
-	fmt.Printf("🔒 This package demonstrates SLSA Level 3 provenance generation\n")
-	fmt.Printf("✅ Generated using official SLSA Go builder\n")
-	fmt.Printf("🛡️  Verified with slsa-verifier\n")
+	color.Cyan("🎯 Zobra Go - SLSA Demonstration Package %s", version)
+	color.Green("📅 Built at: %s", time.Now().Format(time.RFC3339))
+	color.Yellow("🔒 This package demonstrates SLSA Level 3 provenance generation")
+	color.Blue("✅ Generated using official SLSA Go builder")
+	color.Magenta("🛡️  Verified with slsa-verifier")
 	
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
