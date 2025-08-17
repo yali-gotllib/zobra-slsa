@@ -246,14 +246,31 @@ jobs:
 
 
 
-  # Generate SLSA provenance
-  provenance:
+  # Generate SLSA provenance for GitHub Container Registry
+  provenance-ghcr:
     needs: [build]
     permissions:
       actions: read
       id-token: write
       packages: write
-    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+    if: (startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch') && contains(needs.build.outputs.image, 'ghcr.io')
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v2.1.0
+    with:
+      image: ${{ needs.build.outputs.image }}
+      digest: ${{ needs.build.outputs.digest }}
+      registry-username: ${{ github.actor }}
+      private-repository: ${{ github.event.repository.private }}
+    secrets:
+      registry-password: ${{ secrets.GITHUB_TOKEN }}
+
+  # Generate SLSA provenance for other registries
+  provenance-other:
+    needs: [build]
+    permissions:
+      actions: read
+      id-token: write
+      packages: write
+    if: (startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch') && !contains(needs.build.outputs.image, 'ghcr.io')
     uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v2.1.0
     with:
       image: ${{ needs.build.outputs.image }}
