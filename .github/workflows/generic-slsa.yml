@@ -101,8 +101,24 @@ jobs:
             "generic")
               BUILD_CMD="${{ github.event.inputs.build_command }}"
               PATTERN="${{ github.event.inputs.artifact_pattern }}"
+
+              if [ -z "$BUILD_CMD" ]; then
+                echo "❌ Generic project detected but no build command provided"
+                echo "💡 For universal auto-detection to work, you need:"
+                echo "   1. A supported project type (go.mod, pyproject.toml, package.json)"
+                echo "   2. OR manual inputs with artifact_type=generic and build_command"
+                echo ""
+                echo "🔧 Examples for unsupported languages:"
+                echo "   Rust: artifact_type=generic, build_command='cargo build --release'"
+                echo "   Java: artifact_type=generic, build_command='mvn clean package'"
+                echo "   C++:  artifact_type=generic, build_command='make all'"
+                echo ""
+                echo "📚 See README_GENERIC_SLSA.md for complete examples"
+                exit 1
+              fi
+
               echo "setup_command=echo 'Generic setup - no specific setup required'" >> "$GITHUB_OUTPUT"
-              echo "build_command=${BUILD_CMD:-echo 'No build command specified'}" >> "$GITHUB_OUTPUT"
+              echo "build_command=$BUILD_CMD" >> "$GITHUB_OUTPUT"
               echo "artifact_pattern=${PATTERN:-*}" >> "$GITHUB_OUTPUT"
               echo "artifact_path=." >> "$GITHUB_OUTPUT"
               ;;
