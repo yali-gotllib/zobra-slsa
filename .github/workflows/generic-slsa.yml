@@ -160,6 +160,163 @@ jobs:
         with:
           node-version: '18'
 
+      # Smart dependency installation for generic builds
+      - name: Auto-install dependencies for generic builds
+        if: needs.detect.outputs.artifact_type == 'generic'
+        run: |
+          set -euo pipefail
+          echo "🔍 Analyzing build command for required dependencies..."
+
+          BUILD_CMD="${{ needs.detect.outputs.build_command }}"
+          echo "Build command: $BUILD_CMD"
+
+          # Function to check if command exists
+          command_exists() {
+            command -v "$1" >/dev/null 2>&1
+          }
+
+          # Function to install Rust
+          install_rust() {
+            echo "🦀 Installing Rust toolchain..."
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+            source ~/.cargo/env
+            echo "✅ Rust installed: $(rustc --version)"
+          }
+
+          # Function to install Zig
+          install_zig() {
+            echo "🦎 Installing Zig..."
+            ZIG_VERSION="0.11.0"
+            wget -q "https://ziglang.org/download/${ZIG_VERSION}/zig-linux-x86_64-${ZIG_VERSION}.tar.xz"
+            tar -xf "zig-linux-x86_64-${ZIG_VERSION}.tar.xz"
+            sudo mv "zig-linux-x86_64-${ZIG_VERSION}" /opt/zig
+            sudo ln -sf /opt/zig/zig /usr/local/bin/zig
+            echo "✅ Zig installed: $(zig version)"
+          }
+
+          # Function to install Maven
+          install_maven() {
+            echo "☕ Installing Maven..."
+            sudo apt-get update -q
+            sudo apt-get install -y maven
+            echo "✅ Maven installed: $(mvn --version | head -1)"
+          }
+
+          # Function to install .NET
+          install_dotnet() {
+            echo "🔷 Installing .NET SDK..."
+            wget https://packages.microsoft.com/config/ubuntu/20.04/packages-microsoft-prod.deb -O packages-microsoft-prod.deb
+            sudo dpkg -i packages-microsoft-prod.deb
+            sudo apt-get update -q
+            sudo apt-get install -y dotnet-sdk-8.0
+            echo "✅ .NET installed: $(dotnet --version)"
+          }
+
+          # Function to install CMake
+          install_cmake() {
+            echo "🏗️ Installing CMake..."
+            sudo apt-get update -q
+            sudo apt-get install -y cmake build-essential
+            echo "✅ CMake installed: $(cmake --version | head -1)"
+          }
+
+          # Function to install Ruby
+          install_ruby() {
+            echo "💎 Installing Ruby..."
+            sudo apt-get update -q
+            sudo apt-get install -y ruby-full rubygems
+            echo "✅ Ruby installed: $(ruby --version)"
+          }
+
+          # Function to install PHP
+          install_php() {
+            echo "🐘 Installing PHP and Composer..."
+            sudo apt-get update -q
+            sudo apt-get install -y php php-cli php-mbstring php-xml unzip
+            curl -sS https://getcomposer.org/installer | php
+            sudo mv composer.phar /usr/local/bin/composer
+            echo "✅ PHP installed: $(php --version | head -1)"
+            echo "✅ Composer installed: $(composer --version)"
+          }
+
+          # Detect and install required tools
+          if echo "$BUILD_CMD" | grep -q "cargo"; then
+            if ! command_exists cargo; then
+              install_rust
+            else
+              echo "✅ Rust already available: $(cargo --version)"
+            fi
+          fi
+
+          if echo "$BUILD_CMD" | grep -q "zig"; then
+            if ! command_exists zig; then
+              install_zig
+            else
+              echo "✅ Zig already available: $(zig version)"
+            fi
+          fi
+
+          if echo "$BUILD_CMD" | grep -q "mvn"; then
+            if ! command_exists mvn; then
+              install_maven
+            else
+              echo "✅ Maven already available: $(mvn --version | head -1)"
+            fi
+          fi
+
+          if echo "$BUILD_CMD" | grep -q "dotnet"; then
+            if ! command_exists dotnet; then
+              install_dotnet
+            else
+              echo "✅ .NET already available: $(dotnet --version)"
+            fi
+          fi
+
+          if echo "$BUILD_CMD" | grep -q "cmake"; then
+            if ! command_exists cmake; then
+              install_cmake
+            else
+              echo "✅ CMake already available: $(cmake --version | head -1)"
+            fi
+          fi
+
+          if echo "$BUILD_CMD" | grep -q "gem build"; then
+            if ! command_exists gem; then
+              install_ruby
+            else
+              echo "✅ Ruby already available: $(ruby --version)"
+            fi
+          fi
+
+          if echo "$BUILD_CMD" | grep -q "composer"; then
+            if ! command_exists composer; then
+              install_php
+            else
+              echo "✅ PHP/Composer already available: $(composer --version)"
+            fi
+          fi
+
+          echo "🎯 Dependency installation complete!"
+
+      # Setup environment for installed tools
+      - name: Setup environment for generic builds
+        if: needs.detect.outputs.artifact_type == 'generic'
+        run: |
+          # Add Rust to PATH if installed
+          if [ -f ~/.cargo/env ]; then
+            source ~/.cargo/env
+            echo "PATH=$PATH" >> $GITHUB_ENV
+            echo "CARGO_HOME=$CARGO_HOME" >> $GITHUB_ENV
+            echo "RUSTUP_HOME=$RUSTUP_HOME" >> $GITHUB_ENV
+            echo "🦀 Rust environment configured"
+          fi
+
+          # Add Zig to PATH if installed
+          if [ -d /opt/zig ]; then
+            echo "/opt/zig" >> $GITHUB_PATH
+            echo "🦎 Zig environment configured"
+          fi
+
       # Run setup commands
       - name: Setup dependencies
         run: |
