@@ -246,7 +246,7 @@ jobs:
     with:
       image: ${{ needs.build.outputs.image }}
       digest: ${{ needs.build.outputs.digest }}
-      registry-username: ${{ secrets.REGISTRY_USERNAME }}
       private-repository: ${{ github.event.repository.private }}
     secrets:
+      registry-username: ${{ secrets.REGISTRY_USERNAME }}
       registry-password: ${{ secrets.REGISTRY_PASSWORD }}
