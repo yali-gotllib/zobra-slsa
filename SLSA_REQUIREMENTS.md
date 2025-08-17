@@ -422,7 +422,7 @@ uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container
 ### Critical Requirements
 
 #### Version Constraints
-- SLSA Generator: v2.1.0 or later
+- SLSA Generator: v1.10.0 (compatible with slsa-verifier v2.6.0)
 - GitHub Actions: Use v4 versions (v3 deprecated)
 - Checkout: actions/checkout@v4
 - Upload Artifact: actions/upload-artifact@v4
