@@ -180,7 +180,12 @@ jobs:
             echo "🦀 Installing Rust toolchain..."
             curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
             source ~/.cargo/env
+            # Set environment variables for GitHub Actions
+            echo "PATH=$PATH" >> $GITHUB_ENV
+            echo "CARGO_HOME=$CARGO_HOME" >> $GITHUB_ENV
+            echo "RUSTUP_HOME=$RUSTUP_HOME" >> $GITHUB_ENV
             echo "✅ Rust installed: $(rustc --version)"
+            echo "🔧 Rust environment configured for workflow"
           }
 
           # Function to install Zig
@@ -191,7 +196,10 @@ jobs:
             tar -xf "zig-linux-x86_64-${ZIG_VERSION}.tar.xz"
             sudo mv "zig-linux-x86_64-${ZIG_VERSION}" /opt/zig
             sudo ln -sf /opt/zig/zig /usr/local/bin/zig
+            # Add to PATH for current workflow
+            echo "/opt/zig" >> $GITHUB_PATH
             echo "✅ Zig installed: $(zig version)"
+            echo "🔧 Zig environment configured for workflow"
           }
 
           # Function to install Maven
@@ -298,24 +306,31 @@ jobs:
 
           echo "🎯 Dependency installation complete!"
 
-      # Setup environment for installed tools
-      - name: Setup environment for generic builds
-        if: needs.detect.outputs.artifact_type == 'generic'
-        run: |
-          # Add Rust to PATH if installed
-          if [ -f ~/.cargo/env ]; then
-            source ~/.cargo/env
-            echo "PATH=$PATH" >> $GITHUB_ENV
-            echo "CARGO_HOME=$CARGO_HOME" >> $GITHUB_ENV
-            echo "RUSTUP_HOME=$RUSTUP_HOME" >> $GITHUB_ENV
-            echo "🦀 Rust environment configured"
-          fi
+          # Universal environment refresh for all installed tools
+          echo "🔄 Refreshing environment for all installed tools..."
 
-          # Add Zig to PATH if installed
-          if [ -d /opt/zig ]; then
-            echo "/opt/zig" >> $GITHUB_PATH
-            echo "🦎 Zig environment configured"
-          fi
+          # Reload system environment
+          source /etc/environment 2>/dev/null || true
+
+          # Ensure common tool paths are in PATH
+          export PATH="/usr/local/bin:/opt/zig:$HOME/.cargo/bin:$PATH"
+
+          # Update GitHub Actions environment universally
+          echo "PATH=$PATH" >> $GITHUB_ENV
+
+          # Verify all tools are accessible
+          echo "🔍 Verifying installed tools accessibility:"
+          for tool in cargo rustc zig mvn dotnet cmake gem composer php; do
+            if command -v "$tool" >/dev/null 2>&1; then
+              echo "✅ $tool: $(command -v $tool)"
+            else
+              echo "❌ $tool: not found in PATH"
+            fi
+          done
+
+          echo "🌍 Universal environment setup complete!"
+
+
 
       # Run setup commands
       - name: Setup dependencies
@@ -327,6 +342,18 @@ jobs:
       - name: Build artifacts
         run: |
           echo "🏗️ Building artifacts for ${{ needs.detect.outputs.artifact_type }}..."
+          echo "🔧 Build command: ${{ needs.detect.outputs.build_command }}"
+          echo "📁 Working directory: $(pwd)"
+          echo "🛠️ Available tools:"
+          which cargo || echo "❌ cargo not found"
+          which rustc || echo "❌ rustc not found"
+          which zig || echo "❌ zig not found"
+          echo "🌍 Environment:"
+          echo "PATH=$PATH"
+          echo "CARGO_HOME=$CARGO_HOME"
+          echo "RUSTUP_HOME=$RUSTUP_HOME"
+
+          echo "🚀 Executing build command..."
           ${{ needs.detect.outputs.build_command }}
           
           echo "📦 Built artifacts:"
