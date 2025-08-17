@@ -73,6 +73,29 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Determine Registry Credentials for Provenance
+        id: registry-creds
+        run: |
+          set -euo pipefail
+          echo "Determining registry credentials for SLSA provenance..."
+
+          REGISTRY="${{ env.IMAGE_REGISTRY }}"
+
+          # Universal approach: Use the same authentication pattern for ANY registry
+          if [ "$REGISTRY" = "ghcr.io" ]; then
+            # GitHub Container Registry uses GitHub token
+            echo "Using GitHub Container Registry credentials"
+            echo "username=${{ github.actor }}" >> "$GITHUB_OUTPUT"
+            echo "password_secret=GITHUB_TOKEN" >> "$GITHUB_OUTPUT"
+          else
+            # ALL other registries use the universal pattern
+            echo "Using universal registry credentials for $REGISTRY"
+            echo "username=${{ secrets.REGISTRY_USERNAME }}" >> "$GITHUB_OUTPUT"
+            echo "password_secret=REGISTRY_PASSWORD" >> "$GITHUB_OUTPUT"
+          fi
+
+          echo "Registry credentials determined for provenance"
+
       - name: Universal Registry Authentication
         run: |
           set -euo pipefail
@@ -161,28 +184,7 @@ jobs:
           digest=$(crane digest "$tag")
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
 
-      - name: Determine Registry Credentials for Provenance
-        id: registry-creds
-        run: |
-          set -euo pipefail
-          echo "Determining registry credentials for SLSA provenance..."
-          
-          REGISTRY="${{ env.IMAGE_REGISTRY }}"
-          
-          # Universal approach: Use the same authentication pattern for ANY registry
-          if [ "$REGISTRY" = "ghcr.io" ]; then
-            # GitHub Container Registry uses GitHub token
-            echo "Using GitHub Container Registry credentials"
-            echo "username=${{ github.actor }}" >> "$GITHUB_OUTPUT"
-            echo "password_secret=GITHUB_TOKEN" >> "$GITHUB_OUTPUT"
-          else
-            # ALL other registries use the universal pattern
-            echo "Using universal registry credentials for $REGISTRY"
-            echo "username=${{ secrets.REGISTRY_USERNAME }}" >> "$GITHUB_OUTPUT"
-            echo "password_secret=REGISTRY_PASSWORD" >> "$GITHUB_OUTPUT"
-          fi
-          
-          echo "Registry credentials determined for provenance"
+
 
       - name: Output image
         id: image
