@@ -36,6 +36,143 @@ go install github.com/slsa-framework/slsa-verifier/v2/cli/slsa-verifier@latest
 ./verify_generic_slsa.sh -r owner/repo -t v1.0.0
 ```
 
+## ⚙️ Workflow Input Fields
+
+When running the workflow manually, you can configure these input fields:
+
+### 📋 Input Field Reference
+
+| Field | Purpose | When to Use | Examples |
+|-------|---------|-------------|----------|
+| **`artifact_type`** | Override auto-detection | When you want specific build behavior | `go`, `python`, `nodejs`, `generic` |
+| **`tag`** | Version tag for release | When building for a specific version | `v1.0.0`, `release-2024-01`, `beta-1.2` |
+| **`build_command`** | Custom build instructions | For unsupported languages or custom builds | `cargo build --release`, `make all` |
+| **`artifact_pattern`** | Files to include in provenance | When artifacts are in non-standard locations | `target/release/*`, `dist/*.whl` |
+
+### 🎯 Universal Auto-Detection (Recommended)
+
+**Leave ALL fields empty** for automatic detection and optimal defaults:
+
+```yaml
+Branch: main
+artifact_type: [LEAVE EMPTY]
+tag: [LEAVE EMPTY]
+build_command: [LEAVE EMPTY]
+artifact_pattern: [LEAVE EMPTY]
+```
+
+**What happens:**
+- ✅ **Auto-detects** project type (Go, Python, Node.js, or generic)
+- ✅ **Uses optimal** build commands for detected language
+- ✅ **Applies best practices** for artifact patterns
+- ✅ **Creates release** with commit hash as identifier
+
+### 🔧 Manual Override Examples
+
+#### **🐹 Go Project Override:**
+```yaml
+artifact_type: go
+tag: go-v1.0.0
+build_command: [LEAVE EMPTY]  # Uses: cross-platform Go builds
+artifact_pattern: [LEAVE EMPTY]  # Uses: zobra-slsa-*
+```
+
+#### **🐍 Python Project Override:**
+```yaml
+artifact_type: python
+tag: python-v1.0.0
+build_command: [LEAVE EMPTY]  # Uses: python -m build
+artifact_pattern: [LEAVE EMPTY]  # Uses: dist/* files only
+```
+
+#### **🦀 Rust Project (Generic):**
+```yaml
+artifact_type: generic
+tag: rust-v1.0.0
+build_command: cargo build --release
+artifact_pattern: target/release/*
+```
+
+#### **☕ Java/Maven Project (Generic):**
+```yaml
+artifact_type: generic
+tag: java-v1.0.0
+build_command: mvn clean package
+artifact_pattern: target/*.jar
+```
+
+#### **🔷 C# .NET Project (Generic):**
+```yaml
+artifact_type: generic
+tag: dotnet-v1.0.0
+build_command: dotnet build --configuration Release
+artifact_pattern: bin/Release/net8.0/*
+```
+
+### 📖 Field Details
+
+#### **`artifact_type`**
+- **Purpose**: Controls which build system to use
+- **Auto-detection priority**: `go.mod` → `pyproject.toml` → `package.json` → `generic`
+- **Valid values**: `go`, `python`, `nodejs`, `generic`
+- **Leave empty**: For automatic detection (recommended)
+
+#### **`tag`**
+- **Purpose**: Creates a GitHub release with this tag name
+- **Format**: Any valid Git tag (e.g., `v1.0.0`, `release-2024-01`)
+- **Leave empty**: Uses commit hash as release identifier
+- **Best practice**: Use semantic versioning (`v1.0.0`)
+
+#### **`build_command`**
+- **Purpose**: Shell command(s) to build your artifacts
+- **Multi-line support**: Use `|` for complex builds
+- **Leave empty**: Uses language-specific defaults
+- **Examples**:
+  - `make all`
+  - `cargo build --release`
+  - `docker build -t app . && docker save app -o app.tar`
+
+#### **`artifact_pattern`**
+- **Purpose**: Glob pattern matching files to include in provenance
+- **Supports**: Wildcards (`*`), specific files, directories
+- **Leave empty**: Uses language-specific patterns
+- **Examples**:
+  - `target/release/*` (Rust binaries)
+  - `dist/*.whl dist/*.tar.gz` (Python packages)
+  - `build/bin/myapp` (specific binary)
+
+### 🌍 Language-Specific Defaults
+
+When using auto-detection, these defaults are applied:
+
+#### **🐹 Go Projects** (`go.mod` detected):
+```yaml
+build_command: "Cross-platform builds for Linux, macOS, Windows"
+artifact_pattern: "zobra-slsa-*"
+artifact_path: "."
+```
+
+#### **🐍 Python Projects** (`pyproject.toml` detected):
+```yaml
+build_command: "python -m build"
+artifact_pattern: "*"  # Files only in dist/
+artifact_path: "dist"
+```
+
+#### **📦 Node.js Projects** (`package.json` detected):
+```yaml
+build_command: "npm run build && npm pack"
+artifact_pattern: "*.tgz"
+artifact_path: "."
+```
+
+#### **🔧 Generic Projects** (fallback):
+```yaml
+build_command: "[MANUAL INPUT REQUIRED]"
+artifact_pattern: "*"
+artifact_path: "."
+```
+
 ## 📁 Files Included
 
 | File | Purpose |
@@ -220,6 +357,89 @@ rm .github/workflows/python-slsa.yml
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 📋 Quick Reference - Copy & Paste Inputs
+
+### 🌍 Universal Auto-Detection (Recommended)
+```
+Branch: main
+artifact_type: [LEAVE EMPTY]
+tag: [LEAVE EMPTY]
+build_command: [LEAVE EMPTY]
+artifact_pattern: [LEAVE EMPTY]
+```
+
+### 🦀 Rust Project
+```
+Branch: main
+artifact_type: generic
+tag: rust-v1.0.0
+build_command: cargo build --release
+artifact_pattern: target/release/*
+```
+
+### 🦎 Zig Project
+```
+Branch: main
+artifact_type: generic
+tag: zig-v1.0.0
+build_command: zig build -Doptimize=ReleaseFast
+artifact_pattern: zig-out/bin/*
+```
+
+### ☕ Java/Maven Project
+```
+Branch: main
+artifact_type: generic
+tag: java-v1.0.0
+build_command: mvn clean package
+artifact_pattern: target/*.jar
+```
+
+### 🔷 C# .NET Project
+```
+Branch: main
+artifact_type: generic
+tag: dotnet-v1.0.0
+build_command: dotnet build --configuration Release
+artifact_pattern: bin/Release/net8.0/*
+```
+
+### 💎 Ruby Gem Project
+```
+Branch: main
+artifact_type: generic
+tag: ruby-v1.0.0
+build_command: gem build *.gemspec
+artifact_pattern: *.gem
+```
+
+### 🐘 PHP Composer Project
+```
+Branch: main
+artifact_type: generic
+tag: php-v1.0.0
+build_command: composer install --no-dev && composer dump-autoload --optimize
+artifact_pattern: vendor/autoload.php
+```
+
+### 🏗️ CMake C++ Project
+```
+Branch: main
+artifact_type: generic
+tag: cmake-v1.0.0
+build_command: mkdir -p build && cd build && cmake .. && make -j$(nproc)
+artifact_pattern: build/*
+```
+
+### 📦 Docker Container
+```
+Branch: main
+artifact_type: generic
+tag: docker-v1.0.0
+build_command: docker build -t myapp:latest . && docker save myapp:latest -o myapp.tar
+artifact_pattern: myapp.tar
+```
 
 ## 🙏 Acknowledgments
 
