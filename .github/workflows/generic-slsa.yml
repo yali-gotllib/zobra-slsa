@@ -420,50 +420,82 @@ jobs:
         run: |
           set -euo pipefail
           echo "🔍 Generating hashes for SLSA provenance..."
-          
+
           cd "${{ needs.detect.outputs.artifact_path }}"
-          
-          # Find all files matching the pattern(s) - works for any artifact type
+
+          # Universal artifact finding - works for any pattern and any project structure
           echo "🔍 Looking for artifacts matching: ${{ needs.detect.outputs.artifact_pattern }}"
 
-          # Use find to get only files (not directories) matching patterns (search all subdirectories)
-          ARTIFACT_FILES=$(find . -type f \( -name "${{ needs.detect.outputs.artifact_pattern }}" \) 2>/dev/null || true)
+          # Use shell globbing with nullglob for reliable pattern matching
+          shopt -s nullglob
+          shopt -s globstar
 
-          # If no files found with simple pattern, try expanding multiple patterns
-          if [ -z "$ARTIFACT_FILES" ]; then
-            echo "🔄 Trying expanded pattern matching..."
-            ARTIFACT_FILES=""
-            for pattern in ${{ needs.detect.outputs.artifact_pattern }}; do
-              FILES=$(find . -type f -name "$pattern" 2>/dev/null || true)
-              if [ -n "$FILES" ]; then
-                ARTIFACT_FILES="$ARTIFACT_FILES $FILES"
+          # Convert pattern to array and find all matching files
+          PATTERN="${{ needs.detect.outputs.artifact_pattern }}"
+          ARTIFACT_FILES=()
+
+          # Handle different pattern types universally
+          if [[ "$PATTERN" == *"/"* ]]; then
+            # Pattern contains path (e.g., "target/release/*", "dist/*", "build/*")
+            for file in $PATTERN; do
+              if [[ -f "$file" ]]; then
+                ARTIFACT_FILES+=("$file")
+              fi
+            done
+          else
+            # Pattern is just filename (e.g., "*.jar", "*.exe", "*")
+            # Search recursively for the pattern
+            while IFS= read -r -d '' file; do
+              ARTIFACT_FILES+=("$file")
+            done < <(find . -type f -name "$PATTERN" -print0 2>/dev/null)
+          fi
+
+          # If still no files, try broader search patterns
+          if [[ ${#ARTIFACT_FILES[@]} -eq 0 ]]; then
+            echo "🔄 Trying broader pattern matching..."
+
+            # Try common artifact locations with the pattern
+            for dir in . target/release target/debug dist build out bin; do
+              if [[ -d "$dir" ]]; then
+                while IFS= read -r -d '' file; do
+                  ARTIFACT_FILES+=("$file")
+                done < <(find "$dir" -type f -name "$PATTERN" -print0 2>/dev/null)
               fi
             done
           fi
 
-          # Remove leading ./ and extra spaces
-          ARTIFACT_FILES=$(echo $ARTIFACT_FILES | sed 's|./||g' | tr -s ' ')
+          # Remove duplicates and sort
+          if [[ ${#ARTIFACT_FILES[@]} -gt 0 ]]; then
+            readarray -t ARTIFACT_FILES < <(printf '%s\n' "${ARTIFACT_FILES[@]}" | sort -u)
+          fi
 
-          if [ -z "$ARTIFACT_FILES" ]; then
+          if [[ ${#ARTIFACT_FILES[@]} -eq 0 ]]; then
             echo "❌ No artifacts found matching pattern: ${{ needs.detect.outputs.artifact_pattern }}"
             echo "📁 Contents of ${{ needs.detect.outputs.artifact_path }}:"
             ls -la
-            echo "🔍 All files in directory:"
-            find . -type f -maxdepth 2
+            echo "🔍 All files in directory tree:"
+            find . -type f | head -20
+            echo "💡 Common artifact locations to check:"
+            for dir in target/release target/debug dist build out bin; do
+              if [[ -d "$dir" ]]; then
+                echo "📂 $dir/:"
+                find "$dir" -type f | head -5
+              fi
+            done
             exit 1
           fi
 
-          echo "📋 Found artifacts:"
-          for file in $ARTIFACT_FILES; do
+          echo "📋 Found ${#ARTIFACT_FILES[@]} artifacts:"
+          for file in "${ARTIFACT_FILES[@]}"; do
             ls -la "$file"
           done
 
           # Generate base64-encoded hashes as required by SLSA
-          echo "hashes=$(sha256sum $ARTIFACT_FILES | base64 -w0)" >> "$GITHUB_OUTPUT"
+          echo "hashes=$(sha256sum "${ARTIFACT_FILES[@]}" | base64 -w0)" >> "$GITHUB_OUTPUT"
 
           echo "✅ Hash generation complete"
           echo "📊 Generated hashes:"
-          sha256sum $ARTIFACT_FILES
+          sha256sum "${ARTIFACT_FILES[@]}"
 
       # Upload artifacts for later verification
       - name: Upload artifacts
