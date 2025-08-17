@@ -21,10 +21,6 @@ on:
           - 'docker.io'
           - 'gcr.io'
           - 'custom'
-      custom_registry:
-        description: 'Custom registry URL (only if registry=custom, e.g., "my-registry.com:5000")'
-        required: false
-        type: string
       dockerfile_path:
         description: 'Path to Dockerfile (default: ./Dockerfile)'
         required: false
