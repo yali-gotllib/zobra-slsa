@@ -90,7 +90,12 @@ jobs:
           else
             # ALL other registries use the universal pattern
             echo "Using universal registry credentials for $REGISTRY"
-            echo "username=${{ secrets.REGISTRY_USERNAME }}" >> "$GITHUB_OUTPUT"
+            USERNAME="${{ secrets.REGISTRY_USERNAME }}"
+            if [ -z "$USERNAME" ]; then
+              echo "ERROR: REGISTRY_USERNAME secret is not configured"
+              exit 1
+            fi
+            echo "username=$USERNAME" >> "$GITHUB_OUTPUT"
             echo "password_secret=REGISTRY_PASSWORD" >> "$GITHUB_OUTPUT"
           fi
 
@@ -192,6 +197,14 @@ jobs:
           # Set the image as an output
           image_name="${IMAGE_REGISTRY}/${IMAGE_NAME}"
           echo "image=$image_name" >> "$GITHUB_OUTPUT"
+
+      - name: Debug Job Outputs
+        run: |
+          echo "=== DEBUG: Job Outputs ==="
+          echo "registry_username: ${{ steps.registry-creds.outputs.username }}"
+          echo "registry_password_secret: ${{ steps.registry-creds.outputs.password_secret }}"
+          echo "image: ${{ steps.image.outputs.image }}"
+          echo "digest: ${{ steps.digest.outputs.digest }}"
 
   # Generate SLSA provenance
   provenance:
