@@ -10,122 +10,113 @@ on:
   workflow_dispatch:
     inputs:
       artifact_type:
-        description: 'Type of artifact to build (auto, go, python, nodejs, generic)'
-        required: false
-        default: 'auto'
-        type: choice
-        options:
-          - auto
-          - go
-          - python
-          - nodejs
-          - generic
+        description: 'Type of artifact being built (e.g., rust, java, go, cpp, python, nodejs, etc.)'
+        required: true
+        type: string
       tag:
         description: 'Tag to generate provenance for'
         required: false
         default: ''
       build_command:
-        description: 'Custom build command (for generic type)'
-        required: false
-        default: ''
+        description: 'Command to build your artifacts (e.g., "cargo build --release", "mvn clean package")'
+        required: true
+        type: string
       artifact_pattern:
-        description: 'Pattern to match artifacts (for generic type)'
-        required: false
-        default: '*'
+        description: 'Pattern to match built artifacts (e.g., "target/release/*", "target/*.jar")'
+        required: true
+        type: string
 
 permissions: read-all
 
 jobs:
-  # Detect project type and configure build parameters
+  # Validate inputs and set build parameters
   detect:
     runs-on: ubuntu-latest
     outputs:
-      artifact_type: ${{ steps.detect.outputs.artifact_type }}
-      build_command: ${{ steps.detect.outputs.build_command }}
-      setup_command: ${{ steps.detect.outputs.setup_command }}
-      artifact_pattern: ${{ steps.detect.outputs.artifact_pattern }}
-      artifact_path: ${{ steps.detect.outputs.artifact_path }}
+      artifact_type: ${{ steps.validate.outputs.artifact_type }}
+      build_command: ${{ steps.validate.outputs.build_command }}
+      setup_command: ${{ steps.validate.outputs.setup_command }}
+      artifact_pattern: ${{ steps.validate.outputs.artifact_pattern }}
+      artifact_path: ${{ steps.validate.outputs.artifact_path }}
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.inputs.tag || github.ref }}
 
-      - name: Detect project type and configure build
-        id: detect
+      - name: Validate inputs and set build parameters
+        id: validate
         run: |
           set -euo pipefail
-          
-          # Use manual input if provided
-          if [ "${{ github.event.inputs.artifact_type }}" != "auto" ] && [ "${{ github.event.inputs.artifact_type }}" != "" ]; then
-            ARTIFACT_TYPE="${{ github.event.inputs.artifact_type }}"
-            echo "🎯 Using manual artifact type: $ARTIFACT_TYPE"
-          else
-            # Auto-detect based on files present
-            echo "🔍 Auto-detecting project type..."
-            
-            if [ -f "go.mod" ]; then
-              ARTIFACT_TYPE="go"
-              echo "📦 Detected Go project (go.mod found)"
-            elif [ -f "pyproject.toml" ] || [ -f "setup.py" ] || [ -f "setup.cfg" ]; then
-              ARTIFACT_TYPE="python"
-              echo "🐍 Detected Python project (pyproject.toml/setup.py found)"
-            elif [ -f "package.json" ]; then
-              ARTIFACT_TYPE="nodejs"
-              echo "📦 Detected Node.js project (package.json found)"
-            else
-              ARTIFACT_TYPE="generic"
-              echo "❓ No specific project type detected, using generic"
-            fi
+          echo "🔍 Validating generic build inputs..."
+
+          # Get inputs
+          ARTIFACT_TYPE="${{ github.event.inputs.artifact_type }}"
+          BUILD_COMMAND="${{ github.event.inputs.build_command }}"
+          ARTIFACT_PATTERN="${{ github.event.inputs.artifact_pattern }}"
+
+          # Validate required inputs
+          if [ -z "$ARTIFACT_TYPE" ]; then
+            echo "❌ artifact_type is required"
+            echo "� Specify the type of artifacts being built (e.g., 'rust', 'java', 'go', 'cpp', etc.)"
+            echo ""
+            echo "🔧 This workflow is completely generic and treats ALL languages equally"
+            echo "� See README_GENERIC_SLSA.md for complete documentation"
+            exit 1
           fi
-          
-          # Configure build parameters based on type
-          case "$ARTIFACT_TYPE" in
-            "go")
-              echo "setup_command=echo 'Setting up Go...'" >> "$GITHUB_OUTPUT"
-              echo "build_command=go build -o zobra-slsa-linux-amd64 . && GOOS=darwin GOARCH=amd64 go build -o zobra-slsa-darwin-amd64 . && GOOS=windows GOARCH=amd64 go build -o zobra-slsa-windows-amd64.exe ." >> "$GITHUB_OUTPUT"
-              echo "artifact_pattern=zobra-slsa-*" >> "$GITHUB_OUTPUT"
-              echo "artifact_path=." >> "$GITHUB_OUTPUT"
-              ;;
-            "python")
-              echo "setup_command=python -m pip install --upgrade pip && pip install build" >> "$GITHUB_OUTPUT"
-              echo "build_command=python -m build" >> "$GITHUB_OUTPUT"
-              echo "artifact_pattern=*" >> "$GITHUB_OUTPUT"
-              echo "artifact_path=dist" >> "$GITHUB_OUTPUT"
-              ;;
-            "nodejs")
-              echo "setup_command=npm install" >> "$GITHUB_OUTPUT"
-              echo "build_command=npm run build && npm pack" >> "$GITHUB_OUTPUT"
-              echo "artifact_pattern=*.tgz" >> "$GITHUB_OUTPUT"
-              echo "artifact_path=." >> "$GITHUB_OUTPUT"
-              ;;
-            "generic")
-              BUILD_CMD="${{ github.event.inputs.build_command }}"
-              PATTERN="${{ github.event.inputs.artifact_pattern }}"
 
-              if [ -z "$BUILD_CMD" ]; then
-                echo "❌ Generic project detected but no build command provided"
-                echo "💡 For universal auto-detection to work, you need:"
-                echo "   1. A supported project type (go.mod, pyproject.toml, package.json)"
-                echo "   2. OR manual inputs with artifact_type=generic and build_command"
-                echo ""
-                echo "🔧 Examples for unsupported languages:"
-                echo "   Rust: artifact_type=generic, build_command='cargo build --release'"
-                echo "   Java: artifact_type=generic, build_command='mvn clean package'"
-                echo "   C++:  artifact_type=generic, build_command='make all'"
-                echo ""
-                echo "📚 See README_GENERIC_SLSA.md for complete examples"
-                exit 1
-              fi
+          if [ -z "$BUILD_COMMAND" ]; then
+            echo "❌ build_command is required"
+            echo "� Specify the command to build your artifacts"
+            echo ""
+            echo "� Example build commands for any language:"
+            echo "   Rust: 'cargo build --release'"
+            echo "   Java: 'mvn clean package'"
+            echo "   Go:   'go build -o myapp .'"
+            echo "   C++:  'cmake .. && make'"
+            echo "   Zig:  'zig build -Doptimize=ReleaseFast'"
+            echo "   C#:   'dotnet build --configuration Release'"
+            echo "   Python: 'python -m build'"
+            echo "   Node.js: 'npm run build && npm pack'"
+            echo ""
+            echo "📚 See README_GENERIC_SLSA.md for complete documentation"
+            exit 1
+          fi
 
-              echo "setup_command=echo 'Generic setup - no specific setup required'" >> "$GITHUB_OUTPUT"
-              echo "build_command=$BUILD_CMD" >> "$GITHUB_OUTPUT"
-              echo "artifact_pattern=${PATTERN:-*}" >> "$GITHUB_OUTPUT"
-              echo "artifact_path=." >> "$GITHUB_OUTPUT"
-              ;;
-          esac
-          
+          if [ -z "$ARTIFACT_PATTERN" ]; then
+            echo "❌ artifact_pattern is required"
+            echo "💡 Specify the pattern to match your built artifacts"
+            echo ""
+            echo "🔧 Example artifact patterns for any language:"
+            echo "   Rust: 'target/release/*'"
+            echo "   Java: 'target/*.jar'"
+            echo "   Go:   'myapp'"
+            echo "   C++:  'build/*'"
+            echo "   Zig:  'zig-out/bin/*'"
+            echo "   C#:   'bin/Release/net8.0/*'"
+            echo "   Python: 'dist/*'"
+            echo "   Node.js: '*.tgz'"
+            echo ""
+            echo "📚 See README_GENERIC_SLSA.md for complete documentation"
+            exit 1
+          fi
+
+          # Set artifact path (always current directory for generic builds)
+          ARTIFACT_PATH="."
+
+          echo "🎯 Generic build configuration:"
+          echo "   artifact_type: $ARTIFACT_TYPE"
+          echo "   build_command: $BUILD_COMMAND"
+          echo "   artifact_pattern: $ARTIFACT_PATTERN"
+          echo "   artifact_path: $ARTIFACT_PATH"
+
+          # Set outputs
           echo "artifact_type=$ARTIFACT_TYPE" >> "$GITHUB_OUTPUT"
-          echo "✅ Configuration complete for $ARTIFACT_TYPE"
+          echo "build_command=$BUILD_COMMAND" >> "$GITHUB_OUTPUT"
+          echo "setup_command=echo 'Generic setup - no specific setup required'" >> "$GITHUB_OUTPUT"
+          echo "artifact_pattern=$ARTIFACT_PATTERN" >> "$GITHUB_OUTPUT"
+          echo "artifact_path=$ARTIFACT_PATH" >> "$GITHUB_OUTPUT"
+
+          echo "✅ Generic configuration complete for $ARTIFACT_TYPE"
 
   # Build artifacts based on detected/specified type
   build:
