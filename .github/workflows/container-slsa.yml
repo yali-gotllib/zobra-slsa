@@ -254,7 +254,7 @@ jobs:
         run: |
           echo "=== DEBUG: Job Outputs ==="
           echo "registry_username: ${{ steps.registry-creds.outputs.username }}"
-          echo "registry_password_secret: ${{ steps.registry-creds.outputs.password_secret }}"
+          echo "registry_password: [REDACTED]"
           echo "image: ${{ steps.image.outputs.image }}"
           echo "digest: ${{ steps.digest.outputs.digest }}"
 
