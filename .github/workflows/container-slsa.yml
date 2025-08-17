@@ -134,16 +134,13 @@ jobs:
             echo "Authenticating to $REGISTRY using universal credentials..."
             echo "Using REGISTRY_USERNAME and REGISTRY_PASSWORD secrets"
             
-            USERNAME="${{ secrets.REGISTRY_USERNAME }}"
-            PASSWORD="${{ secrets.REGISTRY_PASSWORD }}"
-            
-            if [ -z "$USERNAME" ] || [ -z "$PASSWORD" ]; then
+            if [ -z "${{ secrets.REGISTRY_USERNAME }}" ] || [ -z "${{ secrets.REGISTRY_PASSWORD }}" ]; then
               echo "Error: REGISTRY_USERNAME and REGISTRY_PASSWORD secrets must be configured"
               echo "These secrets work for ANY registry: docker.io, quay.io, ECR, ACR, etc."
               exit 1
             fi
-            
-            echo "$PASSWORD" | docker login "$REGISTRY" --username "$USERNAME" --password-stdin
+
+            echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login "$REGISTRY" --username "${{ secrets.REGISTRY_USERNAME }}" --password-stdin
           fi
           
           echo "Universal registry authentication complete"
@@ -225,7 +222,7 @@ jobs:
       actions: read
       id-token: write
       packages: write
-    if: (startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch') && contains(needs.build.outputs.image, 'ghcr.io')
+    if: (startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch') && github.event.inputs.registry == 'ghcr.io'
     uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v2.1.0
     with:
       image: ${{ needs.build.outputs.image }}
@@ -242,7 +239,7 @@ jobs:
       actions: read
       id-token: write
       packages: write
-    if: (startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch') && !contains(needs.build.outputs.image, 'ghcr.io')
+    if: (startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch') && github.event.inputs.registry != 'ghcr.io'
     uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v2.1.0
     with:
       image: ${{ needs.build.outputs.image }}
