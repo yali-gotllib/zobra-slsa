@@ -506,7 +506,7 @@ jobs:
 
   # Generate SLSA provenance using the official generic generator
   provenance:
-    needs: [build]
+    needs: [detect, build]
     permissions:
       actions: read   # To read the workflow path
       id-token: write # To sign the provenance
@@ -517,3 +517,5 @@ jobs:
       upload-assets: true
       upload-tag-name: ${{ github.event.inputs.tag || github.ref_name }}
       provenance-name: "generic-slsa-provenance-${{ needs.build.outputs.artifact_type }}.intoto.jsonl"
+      private-repository: true
+      path: ${{ needs.detect.outputs.artifact_path }}
