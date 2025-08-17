@@ -212,8 +212,9 @@ jobs:
         id: image
         run: |
           # Set the image as an output
-          image_name="${IMAGE_REGISTRY}/${IMAGE_NAME}"
+          image_name="${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}"
           echo "image=$image_name" >> "$GITHUB_OUTPUT"
+          echo "DEBUG: Final image name = $image_name"
 
 
 
