@@ -147,15 +147,6 @@ jobs:
 
           echo "Registry credentials determined for provenance"
 
-      - name: Debug Credential Determination
-        run: |
-          echo "=== DEBUG: Credential Determination Results ==="
-          echo "Registry: ${{ env.IMAGE_REGISTRY }}"
-          echo "Username from step: ${{ steps.registry-creds.outputs.username }}"
-          echo "Password from step: [REDACTED]"
-          echo "REGISTRY_USERNAME secret exists: ${{ secrets.REGISTRY_USERNAME != '' }}"
-          echo "REGISTRY_PASSWORD secret exists: ${{ secrets.REGISTRY_PASSWORD != '' }}"
-
       - name: Universal Registry Authentication
         run: |
           set -euo pipefail
@@ -253,13 +244,7 @@ jobs:
           image_name="${IMAGE_REGISTRY}/${IMAGE_NAME}"
           echo "image=$image_name" >> "$GITHUB_OUTPUT"
 
-      - name: Debug Job Outputs
-        run: |
-          echo "=== DEBUG: Job Outputs ==="
-          echo "registry_username: ${{ steps.registry-creds.outputs.username }}"
-          echo "registry_password: [REDACTED]"
-          echo "image: ${{ steps.image.outputs.image }}"
-          echo "digest: ${{ steps.digest.outputs.digest }}"
+
 
   # Generate SLSA provenance
   provenance:
