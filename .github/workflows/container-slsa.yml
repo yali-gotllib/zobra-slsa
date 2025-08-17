@@ -273,4 +273,4 @@ jobs:
       registry-username: ${{ needs.build.outputs.registry_username }}
       private-repository: ${{ github.event.repository.private }}
     secrets:
-      registry-password: ${{ env.IMAGE_REGISTRY == 'ghcr.io' && secrets.GITHUB_TOKEN || needs.build.outputs.registry_password }}
+      registry-password: ${{ needs.build.outputs.registry_password }}
