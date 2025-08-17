@@ -61,8 +61,6 @@ jobs:
     outputs:
       image: ${{ steps.image.outputs.image }}
       digest: ${{ steps.digest.outputs.digest }}
-      registry_username: ${{ steps.registry-creds.outputs.username }}
-      registry_password: ${{ steps.registry-creds.outputs.password }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout the repository
@@ -118,34 +116,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Determine Registry Credentials for Provenance
-        id: registry-creds
-        run: |
-          set -euo pipefail
-          echo "Determining registry credentials for SLSA provenance..."
 
-          REGISTRY="${{ env.IMAGE_REGISTRY }}"
-
-          # Universal approach: Use the same authentication pattern for ANY registry
-          if [ "$REGISTRY" = "ghcr.io" ]; then
-            # GitHub Container Registry uses GitHub token
-            echo "Using GitHub Container Registry credentials"
-            echo "username=${{ github.actor }}" >> "$GITHUB_OUTPUT"
-            echo "password=${{ secrets.GITHUB_TOKEN }}" >> "$GITHUB_OUTPUT"
-          else
-            # ALL other registries use the universal pattern
-            echo "Using universal registry credentials for $REGISTRY"
-            USERNAME="${{ secrets.REGISTRY_USERNAME }}"
-            PASSWORD="${{ secrets.REGISTRY_PASSWORD }}"
-            if [ -z "$USERNAME" ] || [ -z "$PASSWORD" ]; then
-              echo "ERROR: REGISTRY_USERNAME and REGISTRY_PASSWORD secrets are not configured"
-              exit 1
-            fi
-            echo "username=$USERNAME" >> "$GITHUB_OUTPUT"
-            echo "password=$PASSWORD" >> "$GITHUB_OUTPUT"
-          fi
-
-          echo "Registry credentials determined for provenance"
 
       - name: Universal Registry Authentication
         run: |
@@ -263,7 +234,7 @@ jobs:
     secrets:
       registry-password: ${{ secrets.GITHUB_TOKEN }}
 
-  # Generate SLSA provenance for other registries
+  # Generate SLSA provenance for all other registries
   provenance-other:
     needs: [build]
     permissions:
@@ -275,7 +246,7 @@ jobs:
     with:
       image: ${{ needs.build.outputs.image }}
       digest: ${{ needs.build.outputs.digest }}
-      registry-username: ${{ needs.build.outputs.registry_username }}
+      registry-username: ${{ secrets.REGISTRY_USERNAME }}
       private-repository: ${{ github.event.repository.private }}
     secrets:
-      registry-password: ${{ needs.build.outputs.registry_password }}
+      registry-password: ${{ secrets.REGISTRY_PASSWORD }}
