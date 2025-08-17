@@ -1,8 +1,8 @@
-# Universal Container SLSA Workflow
+# Professional Container SLSA Workflow
 # Generates SLSA Level 3 provenance for container images
-# Works with ANY container registry using universal authentication patterns
+# Supports major container registries with proven SLSA compatibility
 
-name: Container SLSA Build
+name: Professional Container SLSA Build
 
 on:
   workflow_dispatch:
@@ -12,10 +12,15 @@ on:
         required: true
         default: 'container-v1.0.0'
       registry:
-        description: 'Container registry (ghcr.io, docker.io, quay.io, etc.)'
+        description: 'Container registry (ghcr.io, docker.io, gcr.io, ECR, ACR)'
         required: false
         default: 'ghcr.io'
-        type: string
+        type: choice
+        options:
+          - 'ghcr.io'
+          - 'docker.io'
+          - 'gcr.io'
+          - 'custom'
       dockerfile_path:
         description: 'Path to Dockerfile (default: ./Dockerfile)'
         required: false
@@ -31,12 +36,17 @@ on:
         required: false
         default: ''
         type: string
+      custom_registry:
+        description: 'Custom registry URL (only when registry=custom). SLSA compatibility not guaranteed.'
+        required: false
+        default: ''
+        type: string
 
 permissions:
   contents: read
 
 env:
-  IMAGE_REGISTRY: ${{ github.event.inputs.registry || 'ghcr.io' }}
+  IMAGE_REGISTRY: ${{ github.event.inputs.registry == 'custom' && github.event.inputs.custom_registry || github.event.inputs.registry || 'ghcr.io' }}
   IMAGE_NAME: ${{ github.event.inputs.image_name || github.repository }}
 
 jobs:
@@ -55,17 +65,49 @@ jobs:
       - name: Checkout the repository
         uses: actions/checkout@v4
 
-      - name: Validate and Configure Image Naming
+      - name: Validate Registry and Configure Image Naming
         run: |
           set -euo pipefail
-          echo "Configuring container image naming..."
-          
+          echo "Validating registry and configuring container image naming..."
+
           REGISTRY="${{ env.IMAGE_REGISTRY }}"
           IMAGE_NAME="${{ env.IMAGE_NAME }}"
-          
+
+          # Validate registry is supported for SLSA provenance
+          case "$REGISTRY" in
+            "ghcr.io")
+              echo "✅ GitHub Container Registry - Full SLSA support"
+              ;;
+            "docker.io"|"index.docker.io"|"")
+              echo "✅ Docker Hub - Proven SLSA compatibility"
+              ;;
+            "gcr.io"|"*.gcr.io")
+              echo "✅ Google Container Registry - SLSA supported"
+              ;;
+            "*.dkr.ecr.*.amazonaws.com")
+              echo "✅ Amazon ECR - Cloud provider registry"
+              ;;
+            "*.azurecr.io")
+              echo "✅ Azure Container Registry - Cloud provider registry"
+              ;;
+            *)
+              if [[ "${{ github.event.inputs.registry }}" == "custom" ]]; then
+                echo "⚠️  Custom registry: $REGISTRY"
+                echo "⚠️  SLSA provenance compatibility not guaranteed"
+                echo "⚠️  Supported registries: ghcr.io, docker.io, gcr.io, ECR, ACR"
+              else
+                echo "❌ Unsupported registry: $REGISTRY"
+                echo "❌ This workflow supports proven SLSA-compatible registries only"
+                echo "✅ Supported: ghcr.io, docker.io, gcr.io, ECR, ACR"
+                echo "💡 Use 'custom' option for experimental registries"
+                exit 1
+              fi
+              ;;
+          esac
+
           echo "Registry: $REGISTRY"
           echo "Image Name: $IMAGE_NAME"
-          
+
           # Show final image URL
           FULL_IMAGE="$REGISTRY/$IMAGE_NAME"
           echo "Final image will be: $FULL_IMAGE"
