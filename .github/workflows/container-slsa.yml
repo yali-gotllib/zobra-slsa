@@ -50,8 +50,6 @@ jobs:
       digest: ${{ steps.digest.outputs.digest }}
       registry_username: ${{ steps.registry-creds.outputs.username }}
       registry_password_secret: ${{ steps.registry-creds.outputs.password_secret }}
-      registry_username: ${{ steps.registry-creds.outputs.username }}
-      registry_password_secret: ${{ steps.registry-creds.outputs.password_secret }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout the repository
