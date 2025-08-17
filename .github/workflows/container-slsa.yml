@@ -121,6 +121,38 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
+      - name: Install crane (if needed)
+        run: |
+          set -euo pipefail
+          echo "🔧 Checking for crane command..."
+
+          if command -v crane >/dev/null 2>&1; then
+            echo "✅ crane is already available"
+            crane version
+          else
+            echo "📦 Installing crane..."
+
+            # Detect architecture
+            ARCH=$(uname -m)
+            case $ARCH in
+              x86_64) ARCH="x86_64" ;;
+              aarch64|arm64) ARCH="arm64" ;;
+              *) echo "❌ Unsupported architecture: $ARCH"; exit 1 ;;
+            esac
+
+            # Get latest crane release
+            CRANE_VERSION=$(curl -s https://api.github.com/repos/google/go-containerregistry/releases/latest | grep '"tag_name"' | cut -d'"' -f4)
+            echo "📥 Installing crane $CRANE_VERSION for $ARCH..."
+
+            # Download and install crane
+            curl -sL "https://github.com/google/go-containerregistry/releases/download/${CRANE_VERSION}/go-containerregistry_Linux_${ARCH}.tar.gz" | tar xz
+            sudo mv crane /usr/local/bin/
+            sudo chmod +x /usr/local/bin/crane
+
+            echo "✅ crane installed successfully"
+            crane version
+          fi
+
       - name: Extract digest
         id: digest
         run: |
