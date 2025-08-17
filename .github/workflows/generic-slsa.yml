@@ -250,8 +250,20 @@ jobs:
           # UNIVERSAL: Extract and install ALL missing commands
           echo "🔍 Extracting commands from build command..."
 
-          # Extract all commands from the build command
-          COMMANDS=$(echo "$BUILD_CMD" | grep -oE '\b[a-zA-Z][a-zA-Z0-9_-]*\b' | grep -v '^[0-9]*$' | sort -u)
+          # Extract commands, excluding flags and common shell words
+          COMMANDS=$(echo "$BUILD_CMD" | grep -oE '\b[a-zA-Z][a-zA-Z0-9_-]*\b' | \
+                     grep -v '^[0-9]*$' | \
+                     grep -v '^--' | \
+                     grep -v '^-' | \
+                     grep -v '^release$' | \
+                     grep -v '^debug$' | \
+                     grep -v '^build$' | \
+                     grep -v '^clean$' | \
+                     grep -v '^test$' | \
+                     grep -v '^install$' | \
+                     grep -v '^package$' | \
+                     grep -v '^run$' | \
+                     sort -u)
           echo "📋 Commands found: $COMMANDS"
 
           # Function to attempt universal installation
@@ -328,9 +340,9 @@ jobs:
 
           # Check and install each command
           for cmd in $COMMANDS; do
-            # Skip common shell keywords and operators
+            # Skip common shell keywords, operators, and build flags
             case "$cmd" in
-              "if"|"then"|"else"|"fi"|"for"|"do"|"done"|"while"|"case"|"esac"|"function"|"return"|"exit"|"echo"|"cd"|"ls"|"mkdir"|"rm"|"cp"|"mv"|"cat"|"grep"|"sed"|"awk"|"sort"|"uniq"|"head"|"tail"|"wc"|"find"|"xargs"|"tar"|"gzip"|"gunzip"|"wget"|"curl"|"git"|"sudo"|"apt"|"snap"|"pip"|"install"|"build"|"clean"|"test"|"run"|"exec"|"sh"|"bash"|"zsh"|"fish"|"and"|"or"|"not"|"true"|"false"|"yes"|"no")
+              "if"|"then"|"else"|"fi"|"for"|"do"|"done"|"while"|"case"|"esac"|"function"|"return"|"exit"|"echo"|"cd"|"ls"|"mkdir"|"rm"|"cp"|"mv"|"cat"|"grep"|"sed"|"awk"|"sort"|"uniq"|"head"|"tail"|"wc"|"find"|"xargs"|"tar"|"gzip"|"gunzip"|"wget"|"curl"|"git"|"sudo"|"apt"|"snap"|"pip"|"sh"|"bash"|"zsh"|"fish"|"and"|"or"|"not"|"true"|"false"|"yes"|"no"|"with"|"from"|"import"|"export"|"set"|"unset"|"source"|"alias"|"which"|"type"|"command")
                 echo "⏭️ Skipping shell keyword: $cmd"
                 ;;
               *)
@@ -414,15 +426,15 @@ jobs:
           # Find all files matching the pattern(s) - works for any artifact type
           echo "🔍 Looking for artifacts matching: ${{ needs.detect.outputs.artifact_pattern }}"
 
-          # Use find to get only files (not directories) matching patterns
-          ARTIFACT_FILES=$(find . -maxdepth 1 -type f \( -name "${{ needs.detect.outputs.artifact_pattern }}" \) 2>/dev/null || true)
+          # Use find to get only files (not directories) matching patterns (search all subdirectories)
+          ARTIFACT_FILES=$(find . -type f \( -name "${{ needs.detect.outputs.artifact_pattern }}" \) 2>/dev/null || true)
 
           # If no files found with simple pattern, try expanding multiple patterns
           if [ -z "$ARTIFACT_FILES" ]; then
             echo "🔄 Trying expanded pattern matching..."
             ARTIFACT_FILES=""
             for pattern in ${{ needs.detect.outputs.artifact_pattern }}; do
-              FILES=$(find . -maxdepth 1 -type f -name "$pattern" 2>/dev/null || true)
+              FILES=$(find . -type f -name "$pattern" 2>/dev/null || true)
               if [ -n "$FILES" ]; then
                 ARTIFACT_FILES="$ARTIFACT_FILES $FILES"
               fi
