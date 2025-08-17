@@ -250,6 +250,8 @@ jobs:
 
           REGISTRY="${{ env.IMAGE_REGISTRY }}"
 
+          # Universal approach: Use the same credentials that worked for the build
+          # This ensures consistency between build and provenance steps
           case "$REGISTRY" in
             "ghcr.io")
               echo "🐙 Using GitHub Container Registry credentials"
@@ -258,25 +260,18 @@ jobs:
               ;;
             "docker.io"|"index.docker.io"|"")
               echo "🐳 Using Docker Hub credentials"
-              DOCKER_USER="${{ secrets.DOCKER_USERNAME }}"
-              if [ -n "$DOCKER_USER" ]; then
-                echo "username=$DOCKER_USER" >> "$GITHUB_OUTPUT"
-                echo "password_secret=DOCKER_PASSWORD" >> "$GITHUB_OUTPUT"
-              else
-                echo "❌ Error: DOCKER_USERNAME secret not configured for Docker Hub"
-                exit 1
-              fi
+              echo "username=${{ secrets.DOCKER_USERNAME }}" >> "$GITHUB_OUTPUT"
+              echo "password_secret=DOCKER_PASSWORD" >> "$GITHUB_OUTPUT"
+              ;;
+            "quay.io")
+              echo "🔴 Using Quay.io credentials"
+              echo "username=${{ secrets.QUAY_IO_USERNAME }}" >> "$GITHUB_OUTPUT"
+              echo "password_secret=QUAY_IO_PASSWORD" >> "$GITHUB_OUTPUT"
               ;;
             *)
-              echo "🏢 Using custom registry credentials"
-              REGISTRY_USER="${{ secrets.REGISTRY_USERNAME }}"
-              if [ -n "$REGISTRY_USER" ]; then
-                echo "username=$REGISTRY_USER" >> "$GITHUB_OUTPUT"
-                echo "password_secret=REGISTRY_PASSWORD" >> "$GITHUB_OUTPUT"
-              else
-                echo "❌ Error: REGISTRY_USERNAME secret not configured for $REGISTRY"
-                exit 1
-              fi
+              echo "� Using universal registry credentials"
+              echo "username=${{ secrets.REGISTRY_USERNAME }}" >> "$GITHUB_OUTPUT"
+              echo "password_secret=REGISTRY_PASSWORD" >> "$GITHUB_OUTPUT"
               ;;
           esac
 
