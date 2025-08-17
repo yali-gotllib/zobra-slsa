@@ -518,4 +518,3 @@ jobs:
       upload-tag-name: ${{ github.event.inputs.tag || github.ref_name }}
       provenance-name: "generic-slsa-provenance-${{ needs.build.outputs.artifact_type }}.intoto.jsonl"
       private-repository: ${{ github.event.repository.private }}
-      path: ${{ needs.detect.outputs.artifact_path }}
