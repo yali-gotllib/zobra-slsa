@@ -1,157 +1,109 @@
-# Zobra
+# SLSA Provenance Workflows
 
-A simple Python package for SLSA (Supply-chain Levels for Software Artifacts) provenance demonstration.
+Professional GitHub Actions workflows for generating **SLSA Level 3 provenance** for artifacts and container images.
 
-## Overview
+## 🎯 Overview
 
-Zobra is a minimal Python package created to demonstrate SLSA provenance generation and verification workflows. It provides basic file operations that can be used to showcase supply chain security practices.
+This repository provides **production-ready workflows** that generate authentic SLSA (Supply-chain Levels for Software Artifacts) provenance using the **official SLSA framework**:
 
-## Installation
+### **✅ Universal Artifact Workflow**
+- **Auto-detects** programming languages (Go, Python, Node.js, Rust, Java, C#, etc.)
+- **Automatically installs** missing build tools
+- **Generates SLSA Level 3 provenance** for any artifact type
+- **Works universally** across all languages and frameworks
 
-### From Source
+### **✅ Professional Container Workflow**
+- **Supports major registries** (GitHub Container Registry, Docker Hub, Google Container Registry, Amazon ECR, Azure Container Registry)
+- **Registry-specific authentication** with proven compatibility
+- **Universal credential patterns** for any registry
+- **Production-ready** reliability and validation
 
+## 🚀 Quick Start
+
+### 1. Choose Your Workflow
+
+**For Artifacts (binaries, packages, libraries):**
 ```bash
-git clone https://github.com/wiz-sec/zobra.git
-cd zobra
-pip install -e .
+cp .github/workflows/artifact-slsa.yml your-repo/.github/workflows/
 ```
 
-### For Development
-
+**For Container Images:**
 ```bash
-git clone https://github.com/wiz-sec/zobra.git
-cd zobra
-pip install -e ".[dev]"
+cp .github/workflows/container-slsa.yml your-repo/.github/workflows/
 ```
 
-## Usage
+### 2. Configure Secrets (Container Workflow Only)
 
-### Basic Usage
+For non-GitHub registries, add these secrets to your repository:
+- `REGISTRY_USERNAME` - Your registry username
+- `REGISTRY_PASSWORD` - Your registry password/token
+
+### 3. Run the Workflow
+
+**Artifact Workflow:**
+- Automatically triggers on releases
+- Or run manually via GitHub Actions UI
+
+**Container Workflow:**
+- Run manually via GitHub Actions UI
+- Choose registry and image name
+
+## 📚 Documentation
+
+- **[WORKFLOWS.md](WORKFLOWS.md)** - Complete workflow documentation and configuration
+- **[VERIFICATION.md](VERIFICATION.md)** - How to verify SLSA provenance with slsa-verifier
+
+## 🌟 Key Features
+
+### **Universal Compatibility**
+- **Any programming language** - Go, Python, Node.js, Rust, Java, C#, etc.
+- **Any artifact type** - Binaries, packages, libraries, executables
+- **Any container registry** - GitHub, Docker Hub, Google, Amazon, Azure, custom
+
+### **Professional Quality**
+- **Official SLSA framework** - Uses `slsa-framework/slsa-github-generator`
+- **SLSA Level 3 compliance** - Highest level of supply chain security
+- **Production-ready** - Reliable, validated, enterprise-grade
+
+### **Developer Experience**
+- **Zero configuration** for most use cases
+- **Auto-detection** of build tools and languages
+- **Clear error messages** and validation
+- **Comprehensive documentation**
+
+## 🔐 Security Benefits
+
+✅ **Tamper-proof provenance** - Cryptographically signed build metadata
+✅ **Supply chain transparency** - Complete build environment details
+✅ **Verification capability** - Prove artifacts are built from expected source
+✅ **Compliance ready** - Meets enterprise security requirements
+
+## 🧪 Demo Package
+
+This repository also includes **Zobra** - a simple Python package for demonstrating SLSA provenance:
 
 ```python
 import zobra
 
-# Create a file with default content
-zobra.dump_file('foo.txt')
+# Create a file with package information
+zobra.dump_file('demo.txt')
 
-# Create a file with custom content
-zobra.dump_file('custom.txt', 'Hello, SLSA!')
-
-# Read a file
-content = zobra.read_file('foo.txt')
-print(content)
-
-# Get package version
-version = zobra.get_version()
-print(f"Zobra version: {version}")
+# Read the file
+content = zobra.read_file('demo.txt')
+print(content)  # Shows package version and build info
 ```
 
-### Command Line Usage
+## 🤝 Contributing
 
-After installation, you can also use zobra from the command line:
+1. Fork the repository
+2. Create a feature branch
+3. Test your changes with the workflows
+4. Submit a pull request
 
-```bash
-python -c "import zobra; zobra.dump_file('example.txt')"
-```
+## 📄 License
 
-## 🔒 SLSA Security Implementation
+MIT License - see [LICENSE](LICENSE) file for details.
 
-This package demonstrates **SLSA Level 3** provenance generation using GitHub's native attestation system.
+---
 
-### Verification
-
-Verify the package integrity using GitHub CLI:
-
-```bash
-# Download the package
-pip download zobra --no-deps
-
-# Verify SLSA attestation
-gh attestation verify zobra-*.whl --repo wiz-sec/zobra
-```
-
-### Comprehensive Verification
-
-Run our complete verification script:
-
-```bash
-./verify_slsa_complete.sh
-```
-
-### SLSA Demonstration Scenarios
-
-This package supports the following SLSA demonstration scenarios:
-
-1. **✅ Create package + verify**: Generate SLSA provenance for zobra and verify with GitHub CLI
-2. **✅ Existing package + has SLSA + verify succeeds**: Verify third-party package (Argo CD) with official slsa-verifier
-3. **✅ Existing package + no SLSA + verify failed**: Show verification failure without provenance
-4. **✅ Create package with broken SLSA + verify failed**: Demonstrate verification failure with invalid provenance
-
-### Complete Scenario Testing
-
-Run all scenarios with our comprehensive demonstration script:
-
-```bash
-./demo_all_slsa_scenarios.sh
-```
-
-This script tests:
-- **Scenario 1**: Our zobra package with GitHub attestations
-- **Scenario 2**: Argo CD CLI with official SLSA framework verification
-- **Scenario 3**: Dummy package without provenance (correctly fails)
-- **Scenario 4**: Package with corrupted provenance (correctly fails)
-
-### Security Properties
-
-Our implementation provides:
-- **Build Integrity**: Cryptographic proof of build process
-- **Source Authenticity**: Verification of source repository
-- **Transparency**: Public record in Rekor transparency log
-- **Non-Repudiation**: Immutable build attestation
-
-## Features
-
-- Simple file creation with `dump_file()`
-- File reading with `read_file()`
-- Version information retrieval
-- Automatic timestamp and metadata inclusion
-- Type hints for better development experience
-- Comprehensive error handling
-
-## Development
-
-### Running Tests
-
-```bash
-pytest
-```
-
-### Code Formatting
-
-```bash
-black zobra/
-```
-
-### Type Checking
-
-```bash
-mypy zobra/
-```
-
-## License
-
-MIT License - see LICENSE file for details.
-
-## Contributing
-
-This is a demonstration package for SLSA provenance workflows. Contributions are welcome for educational purposes.
-
-## 📚 Documentation
-
-- **[SLSA Implementation Details](SLSA_IMPLEMENTATION.md)** - Comprehensive guide to our SLSA setup
-- **[Release Process](create_release.md)** - How to create releases with SLSA provenance
-- **[Verification Scripts](verify_slsa_complete.sh)** - Complete verification workflow
-
-## About SLSA
-
-SLSA (Supply-chain Levels for Software Artifacts) is a security framework that helps protect software supply chains. Learn more at [slsa.dev](https://slsa.dev/).
+**Ready to secure your supply chain with SLSA Level 3 provenance? Start with our universal workflows!** 🔐✨
