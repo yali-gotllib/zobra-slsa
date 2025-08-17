@@ -101,6 +101,15 @@ jobs:
 
           echo "Registry credentials determined for provenance"
 
+      - name: Debug Credential Determination
+        run: |
+          echo "=== DEBUG: Credential Determination Results ==="
+          echo "Registry: ${{ env.IMAGE_REGISTRY }}"
+          echo "Username from step: ${{ steps.registry-creds.outputs.username }}"
+          echo "Password secret from step: ${{ steps.registry-creds.outputs.password_secret }}"
+          echo "REGISTRY_USERNAME secret exists: ${{ secrets.REGISTRY_USERNAME != '' }}"
+          echo "REGISTRY_PASSWORD secret exists: ${{ secrets.REGISTRY_PASSWORD != '' }}"
+
       - name: Universal Registry Authentication
         run: |
           set -euo pipefail
