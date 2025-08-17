@@ -44,6 +44,9 @@ on:
 
 permissions:
   contents: read
+  packages: write
+  id-token: write
+  actions: read
 
 env:
   IMAGE_REGISTRY: ${{ github.event.inputs.registry == 'custom' && github.event.inputs.custom_registry || github.event.inputs.registry || 'ghcr.io' }}
