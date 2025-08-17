@@ -36,6 +36,7 @@ on:
         default: ''
         type: string
 
+
 permissions: read-all
 
 env:
@@ -156,18 +157,15 @@ jobs:
           ADDITIONAL_REGISTRIES='${{ github.event.inputs.additional_registries }}'
           if [ "$ADDITIONAL_REGISTRIES" != "[]" ] && [ "$ADDITIONAL_REGISTRIES" != "" ]; then
             echo "🌍 Authenticating to additional registries..."
-            echo "$ADDITIONAL_REGISTRIES" | jq -r '.[]' | while read -r registry; do
-              if [ -n "$registry" ]; then
-                # Convert registry to environment variable format
-                # e.g., "registry.access.redhat.com" -> "REGISTRY_ACCESS_REDHAT_COM"
-                env_prefix=$(echo "$registry" | tr '[:lower:].' '[:upper:]_' | sed 's/-/_/g')
-                username_var="${env_prefix}_USERNAME"
-                password_var="${env_prefix}_PASSWORD"
-
-                echo "🔍 Looking for credentials: ${username_var} / ${password_var}"
-                authenticate_registry "$registry" "$username_var" "$password_var"
-              fi
-            done
+            echo "⚠️  Note: Additional registry authentication requires predefined environment variables"
+            echo "💡 Only the following registries are supported for additional authentication:"
+            echo "   - registry.access.redhat.com (REDHAT_USERNAME/REDHAT_PASSWORD)"
+            echo "   - gcr.io (GCR_USERNAME/GCR_PASSWORD)"
+            echo "   - public.ecr.aws (ECR_USERNAME/ECR_PASSWORD)"
+            echo "   - mcr.microsoft.com (AZURE_USERNAME/AZURE_PASSWORD)"
+            echo "   - quay.io (QUAY_IO_USERNAME/QUAY_IO_PASSWORD)"
+            echo ""
+            echo "🔧 For other registries, ensure they are public or use manual authentication"
           fi
 
           # Common registry authentications (with fallback credentials)
@@ -184,6 +182,9 @@ jobs:
 
           # Azure Container Registry
           authenticate_registry "mcr.microsoft.com" "AZURE_USERNAME" "AZURE_PASSWORD"
+
+          # Quay.io
+          authenticate_registry "quay.io" "QUAY_IO_USERNAME" "QUAY_IO_PASSWORD"
 
           echo "🎯 Multi-registry authentication setup complete!"
         env:
