@@ -225,7 +225,7 @@ jobs:
     if: (startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch') && github.event.inputs.registry == 'ghcr.io'
     uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v2.1.0
     with:
-      image: ${{ needs.build.outputs.image }}
+      image: ${{ github.event.inputs.registry }}/${{ github.event.inputs.image_name || github.repository }}
       digest: ${{ needs.build.outputs.digest }}
       registry-username: ${{ github.actor }}
       private-repository: ${{ github.event.repository.private }}
@@ -242,7 +242,7 @@ jobs:
     if: (startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch') && github.event.inputs.registry != 'ghcr.io'
     uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v2.1.0
     with:
-      image: ${{ needs.build.outputs.image }}
+      image: ${{ github.event.inputs.registry }}/${{ github.event.inputs.image_name || github.repository }}
       digest: ${{ needs.build.outputs.digest }}
       private-repository: ${{ github.event.repository.private }}
     secrets:
