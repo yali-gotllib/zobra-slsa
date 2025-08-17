@@ -50,6 +50,8 @@ jobs:
       digest: ${{ steps.digest.outputs.digest }}
       registry_username: ${{ steps.registry-creds.outputs.username }}
       registry_password_secret: ${{ steps.registry-creds.outputs.password_secret }}
+      registry_username: ${{ steps.registry-creds.outputs.username }}
+      registry_password_secret: ${{ steps.registry-creds.outputs.password_secret }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout the repository
@@ -171,7 +173,7 @@ jobs:
     with:
       image: ${{ needs.build.outputs.image }}
       digest: ${{ needs.build.outputs.digest }}
-      registry-username: ${{ github.event.inputs.registry == 'ghcr.io' && github.actor || secrets.REGISTRY_USERNAME }}
+      registry-username: ${{ needs.build.outputs.registry_username }}
       private-repository: ${{ github.event.repository.private }}
     secrets:
-      registry-password: ${{ github.event.inputs.registry == 'ghcr.io' && secrets.GITHUB_TOKEN || secrets.REGISTRY_PASSWORD }}
+      registry-password: ${{ secrets[needs.build.outputs.registry_password_secret] }}
