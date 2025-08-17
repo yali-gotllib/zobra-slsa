@@ -1,9 +1,10 @@
+# Universal Container SLSA Workflow
+# Generates SLSA Level 3 provenance for container images
+# Works with ANY container registry using universal authentication patterns
+
 name: Container SLSA Build
 
 on:
-  push:
-    tags:
-      - 'container-v*'
   workflow_dispatch:
     inputs:
       tag:
@@ -11,7 +12,7 @@ on:
         required: true
         default: 'container-v1.0.0'
       registry:
-        description: 'Container registry (ghcr.io, docker.io, etc.)'
+        description: 'Container registry (ghcr.io, docker.io, quay.io, etc.)'
         required: false
         default: 'ghcr.io'
         type: string
@@ -25,26 +26,21 @@ on:
         required: false
         default: '.'
         type: string
-      additional_registries:
-        description: 'Additional registries to authenticate (JSON array: ["registry1.com", "registry2.com"])'
-        required: false
-        default: '[]'
-        type: string
       image_name:
-        description: 'Full image name (e.g., "johndoe/myapp", "company/team/myapp"). If empty, uses GitHub repository name.'
+        description: 'Full image name (e.g., "johndoe/myapp"). If empty, uses GitHub repository name.'
         required: false
         default: ''
         type: string
 
-
-permissions: read-all
+permissions:
+  contents: read
 
 env:
   IMAGE_REGISTRY: ${{ github.event.inputs.registry || 'ghcr.io' }}
   IMAGE_NAME: ${{ github.event.inputs.image_name || github.repository }}
 
 jobs:
-  # This step builds our image, pushes it, and outputs the repo hash digest.
+  # Build and push container image
   build:
     permissions:
       contents: read
@@ -62,164 +58,58 @@ jobs:
       - name: Validate and Configure Image Naming
         run: |
           set -euo pipefail
-          echo "🏷️  Configuring container image naming..."
-
+          echo "Configuring container image naming..."
+          
           REGISTRY="${{ env.IMAGE_REGISTRY }}"
           IMAGE_NAME="${{ env.IMAGE_NAME }}"
-
-          echo "📋 Current configuration:"
-          echo "   Registry: $REGISTRY"
-          echo "   Image Name: $IMAGE_NAME"
-
-          # Provide registry-specific naming guidance
-          echo ""
-          echo "💡 Registry-specific naming requirements:"
-          case "$REGISTRY" in
-            "docker.io"|"index.docker.io"|"")
-              echo "   🐳 Docker Hub: username/repository (no hyphens in username)"
-              echo "   Example: johndoe/myapp (not john-doe/myapp)"
-              ;;
-            "quay.io")
-              echo "   🔴 Quay.io: username/repository or organization/repository"
-              echo "   Example: jdoe/myapp or company/myapp"
-              ;;
-            "ghcr.io")
-              echo "   🐙 GitHub Container Registry: Uses GitHub repository name by default"
-              echo "   Example: ${{ github.repository }} (automatic)"
-              ;;
-            *)
-              echo "   🏢 Custom Registry: $REGISTRY"
-              echo "   Check your registry's naming conventions"
-              ;;
-          esac
-
-          # Validate image name format
-          if [[ "$IMAGE_NAME" == *" "* ]]; then
-            echo "❌ Error: Image name cannot contain spaces: '$IMAGE_NAME'"
-            exit 1
-          fi
-
-          if [[ "$IMAGE_NAME" == *"_"* ]] && [[ "$REGISTRY" == "docker.io" || "$REGISTRY" == "index.docker.io" || "$REGISTRY" == "" ]]; then
-            echo "⚠️  Warning: Docker Hub doesn't allow underscores in repository names"
-            echo "   Current: $IMAGE_NAME"
-            echo "   Consider: $(echo "$IMAGE_NAME" | tr '_' '-')"
-          fi
-
+          
+          echo "Registry: $REGISTRY"
+          echo "Image Name: $IMAGE_NAME"
+          
           # Show final image URL
           FULL_IMAGE="$REGISTRY/$IMAGE_NAME"
-          echo ""
-          echo "🎯 Final image will be: $FULL_IMAGE"
-          echo "✅ Image naming configuration complete"
+          echo "Final image will be: $FULL_IMAGE"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Authenticate to Multiple Registries
+      - name: Universal Registry Authentication
         run: |
           set -euo pipefail
-          echo "🔐 Setting up multi-registry authentication..."
-
-          # Function to authenticate to a registry
-          authenticate_registry() {
-            local registry="$1"
-            local username_var="$2"
-            local password_var="$3"
-            local username="${!username_var:-}"
-            local password="${!password_var:-}"
-
-            if [ -n "$username" ] && [ -n "$password" ]; then
-              echo "🔑 Authenticating to $registry..."
-              echo "$password" | docker login "$registry" --username "$username" --password-stdin
-              echo "✅ Successfully authenticated to $registry"
-            else
-              echo "⚠️  No credentials found for $registry (${username_var}/${password_var})"
-              echo "💡 Skipping authentication - assuming public registry or already authenticated"
+          echo "Setting up universal registry authentication..."
+          
+          REGISTRY="${{ env.IMAGE_REGISTRY }}"
+          
+          if [ "$REGISTRY" = "ghcr.io" ]; then
+            # GitHub Container Registry uses GitHub token
+            echo "Authenticating to GitHub Container Registry..."
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io --username "${{ github.actor }}" --password-stdin
+          else
+            # ALL other registries use the universal pattern
+            echo "Authenticating to $REGISTRY using universal credentials..."
+            echo "Using REGISTRY_USERNAME and REGISTRY_PASSWORD secrets"
+            
+            USERNAME="${{ secrets.REGISTRY_USERNAME }}"
+            PASSWORD="${{ secrets.REGISTRY_PASSWORD }}"
+            
+            if [ -z "$USERNAME" ] || [ -z "$PASSWORD" ]; then
+              echo "Error: REGISTRY_USERNAME and REGISTRY_PASSWORD secrets must be configured"
+              echo "These secrets work for ANY registry: docker.io, quay.io, ECR, ACR, etc."
+              exit 1
             fi
-          }
-
-          # Authenticate to target registry (where we push)
-          case "${{ env.IMAGE_REGISTRY }}" in
-            "ghcr.io")
-              echo "🐙 Authenticating to GitHub Container Registry..."
-              echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io --username "${{ github.actor }}" --password-stdin
-              echo "✅ GitHub Container Registry authenticated"
-              ;;
-            "docker.io"|"index.docker.io"|"")
-              authenticate_registry "docker.io" "DOCKER_USERNAME" "DOCKER_PASSWORD"
-              ;;
-            *)
-              # Custom registry - use generic credentials
-              authenticate_registry "${{ env.IMAGE_REGISTRY }}" "REGISTRY_USERNAME" "REGISTRY_PASSWORD"
-              ;;
-          esac
-
-          # Authenticate to additional registries for pulling base images
-          ADDITIONAL_REGISTRIES='${{ github.event.inputs.additional_registries }}'
-          if [ "$ADDITIONAL_REGISTRIES" != "[]" ] && [ "$ADDITIONAL_REGISTRIES" != "" ]; then
-            echo "🌍 Authenticating to additional registries..."
-            echo "⚠️  Note: Additional registry authentication requires predefined environment variables"
-            echo "💡 Only the following registries are supported for additional authentication:"
-            echo "   - registry.access.redhat.com (REDHAT_USERNAME/REDHAT_PASSWORD)"
-            echo "   - gcr.io (GCR_USERNAME/GCR_PASSWORD)"
-            echo "   - public.ecr.aws (ECR_USERNAME/ECR_PASSWORD)"
-            echo "   - mcr.microsoft.com (AZURE_USERNAME/AZURE_PASSWORD)"
-            echo "   - quay.io (QUAY_IO_USERNAME/QUAY_IO_PASSWORD)"
-            echo ""
-            echo "🔧 For other registries, ensure they are public or use manual authentication"
+            
+            echo "$PASSWORD" | docker login "$REGISTRY" --username "$USERNAME" --password-stdin
           fi
+          
+          echo "Universal registry authentication complete"
 
-          # Common registry authentications (with fallback credentials)
-          echo "🔧 Setting up common registry authentications..."
-
-          # Red Hat Registry
-          authenticate_registry "registry.access.redhat.com" "REDHAT_USERNAME" "REDHAT_PASSWORD"
-
-          # Google Container Registry
-          authenticate_registry "gcr.io" "GCR_USERNAME" "GCR_PASSWORD"
-
-          # Amazon ECR (if credentials available)
-          authenticate_registry "public.ecr.aws" "ECR_USERNAME" "ECR_PASSWORD"
-
-          # Azure Container Registry
-          authenticate_registry "mcr.microsoft.com" "AZURE_USERNAME" "AZURE_PASSWORD"
-
-          # Quay.io
-          authenticate_registry "quay.io" "QUAY_IO_USERNAME" "QUAY_IO_PASSWORD"
-
-          echo "🎯 Multi-registry authentication setup complete!"
-        env:
-          # Target registry credentials
-          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-          REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
-          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
-
-          # Common registry credentials (optional)
-          REDHAT_USERNAME: ${{ secrets.REDHAT_USERNAME }}
-          REDHAT_PASSWORD: ${{ secrets.REDHAT_PASSWORD }}
-          GCR_USERNAME: ${{ secrets.GCR_USERNAME }}
-          GCR_PASSWORD: ${{ secrets.GCR_PASSWORD }}
-          ECR_USERNAME: ${{ secrets.ECR_USERNAME }}
-          ECR_PASSWORD: ${{ secrets.ECR_PASSWORD }}
-          AZURE_USERNAME: ${{ secrets.AZURE_USERNAME }}
-          AZURE_PASSWORD: ${{ secrets.AZURE_PASSWORD }}
-
-          # Dynamic registry credentials (customers add as needed)
-          REGISTRY_ACCESS_REDHAT_COM_USERNAME: ${{ secrets.REGISTRY_ACCESS_REDHAT_COM_USERNAME }}
-          REGISTRY_ACCESS_REDHAT_COM_PASSWORD: ${{ secrets.REGISTRY_ACCESS_REDHAT_COM_PASSWORD }}
-          QUAY_IO_USERNAME: ${{ secrets.QUAY_IO_USERNAME }}
-          QUAY_IO_PASSWORD: ${{ secrets.QUAY_IO_PASSWORD }}
-          COMPANY_AZURECR_IO_USERNAME: ${{ secrets.COMPANY_AZURECR_IO_USERNAME }}
-          COMPANY_AZURECR_IO_PASSWORD: ${{ secrets.COMPANY_AZURECR_IO_PASSWORD }}
-
-      - name: Extract metadata (tags, labels) for Docker
+      - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=ref,event=tag
-            type=raw,value=${{ github.event.inputs.tag }},enable={{is_default_branch}}
+            type=raw,value=${{ github.event.inputs.tag }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
@@ -231,10 +121,7 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
-      - name: Install crane
-        uses: imjasonh/setup-crane@v0.4
-
-      - name: Get image digest
+      - name: Extract digest
         id: digest
         run: |
           # Get the first tag from the metadata output
@@ -246,59 +133,45 @@ jobs:
         id: registry-creds
         run: |
           set -euo pipefail
-          echo "🔐 Determining registry credentials for SLSA provenance..."
-
+          echo "Determining registry credentials for SLSA provenance..."
+          
           REGISTRY="${{ env.IMAGE_REGISTRY }}"
-
-          # Universal approach: Use the same credentials that worked for the build
-          # This ensures consistency between build and provenance steps
-          case "$REGISTRY" in
-            "ghcr.io")
-              echo "🐙 Using GitHub Container Registry credentials"
-              echo "username=${{ github.actor }}" >> "$GITHUB_OUTPUT"
-              echo "password_secret=GITHUB_TOKEN" >> "$GITHUB_OUTPUT"
-              ;;
-            "docker.io"|"index.docker.io"|"")
-              echo "🐳 Using Docker Hub credentials"
-              echo "username=${{ secrets.DOCKER_USERNAME }}" >> "$GITHUB_OUTPUT"
-              echo "password_secret=DOCKER_PASSWORD" >> "$GITHUB_OUTPUT"
-              ;;
-            "quay.io")
-              echo "🔴 Using Quay.io credentials"
-              echo "username=${{ secrets.QUAY_IO_USERNAME }}" >> "$GITHUB_OUTPUT"
-              echo "password_secret=QUAY_IO_PASSWORD" >> "$GITHUB_OUTPUT"
-              ;;
-            *)
-              echo "� Using universal registry credentials"
-              echo "username=${{ secrets.REGISTRY_USERNAME }}" >> "$GITHUB_OUTPUT"
-              echo "password_secret=REGISTRY_PASSWORD" >> "$GITHUB_OUTPUT"
-              ;;
-          esac
-
-          echo "✅ Registry credentials determined for provenance"
+          
+          # Universal approach: Use the same authentication pattern for ANY registry
+          if [ "$REGISTRY" = "ghcr.io" ]; then
+            # GitHub Container Registry uses GitHub token
+            echo "Using GitHub Container Registry credentials"
+            echo "username=${{ github.actor }}" >> "$GITHUB_OUTPUT"
+            echo "password_secret=GITHUB_TOKEN" >> "$GITHUB_OUTPUT"
+          else
+            # ALL other registries use the universal pattern
+            echo "Using universal registry credentials for $REGISTRY"
+            echo "username=${{ secrets.REGISTRY_USERNAME }}" >> "$GITHUB_OUTPUT"
+            echo "password_secret=REGISTRY_PASSWORD" >> "$GITHUB_OUTPUT"
+          fi
+          
+          echo "Registry credentials determined for provenance"
 
       - name: Output image
         id: image
         run: |
-          # NOTE: Set the image as an output because the `env` context is not
-          # available to the inputs of a reusable workflow call.
+          # Set the image as an output
           image_name="${IMAGE_REGISTRY}/${IMAGE_NAME}"
           echo "image=$image_name" >> "$GITHUB_OUTPUT"
 
-  # This step calls the container workflow to generate provenance and push it to
-  # the container registry.
+  # Generate SLSA provenance
   provenance:
     needs: [build]
     permissions:
-      actions: read # for detecting the Github Actions environment.
-      id-token: write # for creating OIDC tokens for signing.
-      packages: write # for uploading attestations.
+      actions: read
+      id-token: write
+      packages: write
     if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
     uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v2.1.0
     with:
       image: ${{ needs.build.outputs.image }}
       digest: ${{ needs.build.outputs.digest }}
-      registry-username: ${{ needs.build.outputs.registry_username }}
+      registry-username: ${{ github.event.inputs.registry == 'ghcr.io' && github.actor || secrets.REGISTRY_USERNAME }}
       private-repository: ${{ github.event.repository.private }}
     secrets:
-      registry-password: ${{ secrets[needs.build.outputs.registry_password_secret] }}
+      registry-password: ${{ github.event.inputs.registry == 'ghcr.io' && secrets.GITHUB_TOKEN || secrets.REGISTRY_PASSWORD }}
