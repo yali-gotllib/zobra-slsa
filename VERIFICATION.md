@@ -33,12 +33,13 @@ winget install --id GitHub.cli
 
 ### **Universal Artifact Workflow Verification**
 
-#### **1. Download Artifacts**
+#### **1. Find the Correct Digest**
 ```bash
-# Download from GitHub release
-gh release download v1.0.0 --repo your-org/your-repo
+# For container images, get the digest from the workflow diagnostic job
+# Look for: "🔍 Checking attestation for: IMAGE@sha256:..."
+# This shows the exact digest that has the SLSA attestation
 
-# Or download manually from GitHub Releases page
+# Alternative: Check the workflow "Extract digest" step in build job
 ```
 
 #### **2. Verify with slsa-verifier**
@@ -99,11 +100,17 @@ slsa-verifier verify-image docker.io/username/myapp:v1.0.0 \
 
 #### **2. Registry-Specific Examples**
 
-**Docker Hub:**
+**Docker Hub:** ✅ **VERIFIED WORKING**
 ```bash
-slsa-verifier verify-image docker.io/username/myapp:v1.0.0 \
+# Use the digest from the workflow diagnostic job
+slsa-verifier verify-image docker.io/username/myapp@sha256:abc123... \
   --source-uri github.com/username/myapp \
-  --source-tag v1.0.0
+  --source-branch main
+
+# Example with actual working digest:
+slsa-verifier verify-image docker.io/yaliwizgottlib/example-image-project@sha256:cc88c9d7ba8d7e6e9c02aa9e790ce771ff3ff5af4131772074c272ce9278ea47 \
+  --source-uri github.com/yali-gotllib/example-image-project \
+  --source-branch main
 ```
 
 **GitHub Container Registry:**
@@ -209,7 +216,25 @@ slsa-verifier verify-artifact your-artifact.tar.gz \
 
 ### **Common Issues**
 
-#### **"No provenance found"**
+#### **"No matching attestations" for Container Images**
+```bash
+# 1. Ensure you're using the correct digest
+# Check the workflow "fix-docker-attestation" or "fix-gcr-attestation" job logs
+# Look for: "🔍 Checking attestation for: IMAGE@sha256:..."
+
+# 2. Use the exact digest from the diagnostic job
+./slsa-verifier verify-image docker.io/username/myapp@sha256:CORRECT_DIGEST \
+  --source-uri github.com/username/repo \
+  --source-branch main
+
+# 3. If still failing, check if attestation was actually uploaded
+cosign verify-attestation docker.io/username/myapp@sha256:DIGEST \
+  --type slsaprovenance \
+  --certificate-identity-regexp ".*" \
+  --certificate-oidc-issuer-regexp ".*"
+```
+
+#### **"No provenance found" for Artifacts**
 ```bash
 # Check if provenance file exists
 ls -la *.intoto.jsonl

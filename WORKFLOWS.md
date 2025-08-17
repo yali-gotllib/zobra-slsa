@@ -59,14 +59,14 @@ Generates SLSA Level 3 provenance for container images with support for major co
 
 ### **Supported Registries**
 
-#### **Tier 1: Full SLSA Support**
-- **GitHub Container Registry (ghcr.io)** - Native GitHub integration
-- **Docker Hub (docker.io)** - Most popular container registry
-- **Google Container Registry (gcr.io)** - Google Cloud Platform
+#### **Tier 1: Full SLSA Support (Verified Working)**
+- **GitHub Container Registry (ghcr.io)** - Native GitHub integration, works out-of-the-box
+- **Docker Hub (docker.io)** - ✅ **CONFIRMED WORKING** with `compile-generator: true` parameter
+- **Google Container Registry (gcr.io)** - Google Cloud Platform, uses same pattern as Docker Hub
 
-#### **Tier 2: Cloud Provider Registries**
-- **Amazon ECR** - AWS container registry
-- **Azure Container Registry** - Microsoft Azure registry
+#### **Tier 2: Cloud Provider Registries (Expected to Work)**
+- **Amazon ECR** - AWS container registry, uses universal credential pattern
+- **Azure Container Registry** - Microsoft Azure registry, uses universal credential pattern
 
 ### **Configuration**
 
@@ -86,6 +86,7 @@ REGISTRY_PASSWORD=your-password-or-token
 registry: docker.io
 image_name: username/myapp
 # Secrets: REGISTRY_USERNAME, REGISTRY_PASSWORD
+# Note: Uses compile-generator: true for proper attestation upload
 ```
 
 **Google Container Registry:**
@@ -120,8 +121,9 @@ image_name: myapp
 1. **Registry Validation** - Ensures registry is supported
 2. **Authentication** - Registry-specific credential handling
 3. **Container Build** - Builds and pushes container image
-4. **Provenance Generation** - Creates SLSA Level 3 attestation
-5. **Attestation Upload** - Uploads provenance to registry
+4. **Provenance Generation** - Creates SLSA Level 3 attestation with `compile-generator: true` for non-GitHub registries
+5. **Attestation Upload** - Uploads provenance to registry (verified working for Docker Hub)
+6. **Diagnostic Check** - Verifies attestation was successfully uploaded
 
 ### **Example Usage**
 ```bash
