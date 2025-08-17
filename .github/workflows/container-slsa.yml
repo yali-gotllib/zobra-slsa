@@ -20,7 +20,6 @@ on:
           - 'ghcr.io'
           - 'docker.io'
           - 'gcr.io'
-          - 'custom'
       dockerfile_path:
         description: 'Path to Dockerfile (default: ./Dockerfile)'
         required: false
@@ -232,7 +231,7 @@ jobs:
     secrets:
       registry-password: ${{ secrets.GITHUB_TOKEN }}
 
-  # Generate SLSA provenance for Docker Hub (with attestation fix)
+  # Generate SLSA provenance for Docker Hub (official pattern)
   provenance-docker:
     needs: [build]
     permissions:
@@ -244,11 +243,10 @@ jobs:
     with:
       image: ${{ github.event.inputs.registry }}/${{ github.event.inputs.image_name || github.repository }}
       digest: ${{ needs.build.outputs.digest }}
+      registry-username: ${{ secrets.REGISTRY_USERNAME }}
       private-repository: ${{ github.event.repository.private }}
-      # Try to force attestation upload
       compile-generator: true
     secrets:
-      registry-username: ${{ secrets.REGISTRY_USERNAME }}
       registry-password: ${{ secrets.REGISTRY_PASSWORD }}
 
   # Fix Docker Hub attestation upload
@@ -299,7 +297,7 @@ jobs:
             echo "🔗 Build verification: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           fi
 
-  # Generate SLSA provenance for Google Container Registry
+  # Generate SLSA provenance for Google Container Registry (official pattern)
   provenance-gcr:
     needs: [build]
     permissions:
@@ -311,24 +309,10 @@ jobs:
     with:
       image: ${{ github.event.inputs.registry }}/${{ github.event.inputs.image_name || github.repository }}
       digest: ${{ needs.build.outputs.digest }}
-      private-repository: ${{ github.event.repository.private }}
-    secrets:
       registry-username: ${{ secrets.REGISTRY_USERNAME }}
+      private-repository: ${{ github.event.repository.private }}
+      compile-generator: true
+    secrets:
       registry-password: ${{ secrets.REGISTRY_PASSWORD }}
 
-  # Generate SLSA provenance for custom registries (experimental)
-  provenance-custom:
-    needs: [build]
-    permissions:
-      actions: read
-      id-token: write
-      packages: write
-    if: (startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch') && github.event.inputs.registry == 'custom'
-    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v2.1.0
-    with:
-      image: ${{ github.event.inputs.custom_registry }}/${{ github.event.inputs.image_name || github.repository }}
-      digest: ${{ needs.build.outputs.digest }}
-      private-repository: ${{ github.event.repository.private }}
-    secrets:
-      registry-username: ${{ secrets.REGISTRY_USERNAME }}
-      registry-password: ${{ secrets.REGISTRY_PASSWORD }}
+
