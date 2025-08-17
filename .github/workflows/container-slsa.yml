@@ -25,6 +25,11 @@ on:
         required: false
         default: '.'
         type: string
+      additional_registries:
+        description: 'Additional registries to authenticate (JSON array: ["registry1.com", "registry2.com"])'
+        required: false
+        default: '[]'
+        type: string
 
 permissions: read-all
 
@@ -49,28 +54,103 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Authenticate Docker
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.IMAGE_REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-        if: env.IMAGE_REGISTRY == 'ghcr.io'
+      - name: Authenticate to Multiple Registries
+        run: |
+          set -euo pipefail
+          echo "🔐 Setting up multi-registry authentication..."
 
-      - name: Authenticate Docker (Docker Hub)
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-        if: env.IMAGE_REGISTRY == 'docker.io' || env.IMAGE_REGISTRY == 'index.docker.io'
+          # Function to authenticate to a registry
+          authenticate_registry() {
+            local registry="$1"
+            local username_var="$2"
+            local password_var="$3"
+            local username="${!username_var:-}"
+            local password="${!password_var:-}"
 
-      - name: Authenticate Docker (Custom Registry)
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.IMAGE_REGISTRY }}
-          username: ${{ secrets.REGISTRY_USERNAME }}
-          password: ${{ secrets.REGISTRY_PASSWORD }}
-        if: env.IMAGE_REGISTRY != 'ghcr.io' && env.IMAGE_REGISTRY != 'docker.io' && env.IMAGE_REGISTRY != 'index.docker.io'
+            if [ -n "$username" ] && [ -n "$password" ]; then
+              echo "🔑 Authenticating to $registry..."
+              echo "$password" | docker login "$registry" --username "$username" --password-stdin
+              echo "✅ Successfully authenticated to $registry"
+            else
+              echo "⚠️  No credentials found for $registry (${username_var}/${password_var})"
+              echo "💡 Skipping authentication - assuming public registry or already authenticated"
+            fi
+          }
+
+          # Authenticate to target registry (where we push)
+          case "${{ env.IMAGE_REGISTRY }}" in
+            "ghcr.io")
+              echo "🐙 Authenticating to GitHub Container Registry..."
+              echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io --username "${{ github.actor }}" --password-stdin
+              echo "✅ GitHub Container Registry authenticated"
+              ;;
+            "docker.io"|"index.docker.io"|"")
+              authenticate_registry "docker.io" "DOCKER_USERNAME" "DOCKER_PASSWORD"
+              ;;
+            *)
+              # Custom registry - use generic credentials
+              authenticate_registry "${{ env.IMAGE_REGISTRY }}" "REGISTRY_USERNAME" "REGISTRY_PASSWORD"
+              ;;
+          esac
+
+          # Authenticate to additional registries for pulling base images
+          ADDITIONAL_REGISTRIES='${{ github.event.inputs.additional_registries }}'
+          if [ "$ADDITIONAL_REGISTRIES" != "[]" ] && [ "$ADDITIONAL_REGISTRIES" != "" ]; then
+            echo "🌍 Authenticating to additional registries..."
+            echo "$ADDITIONAL_REGISTRIES" | jq -r '.[]' | while read -r registry; do
+              if [ -n "$registry" ]; then
+                # Convert registry to environment variable format
+                # e.g., "registry.access.redhat.com" -> "REGISTRY_ACCESS_REDHAT_COM"
+                env_prefix=$(echo "$registry" | tr '[:lower:].' '[:upper:]_' | sed 's/-/_/g')
+                username_var="${env_prefix}_USERNAME"
+                password_var="${env_prefix}_PASSWORD"
+
+                echo "🔍 Looking for credentials: ${username_var} / ${password_var}"
+                authenticate_registry "$registry" "$username_var" "$password_var"
+              fi
+            done
+          fi
+
+          # Common registry authentications (with fallback credentials)
+          echo "🔧 Setting up common registry authentications..."
+
+          # Red Hat Registry
+          authenticate_registry "registry.access.redhat.com" "REDHAT_USERNAME" "REDHAT_PASSWORD"
+
+          # Google Container Registry
+          authenticate_registry "gcr.io" "GCR_USERNAME" "GCR_PASSWORD"
+
+          # Amazon ECR (if credentials available)
+          authenticate_registry "public.ecr.aws" "ECR_USERNAME" "ECR_PASSWORD"
+
+          # Azure Container Registry
+          authenticate_registry "mcr.microsoft.com" "AZURE_USERNAME" "AZURE_PASSWORD"
+
+          echo "🎯 Multi-registry authentication setup complete!"
+        env:
+          # Target registry credentials
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+          REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+
+          # Common registry credentials (optional)
+          REDHAT_USERNAME: ${{ secrets.REDHAT_USERNAME }}
+          REDHAT_PASSWORD: ${{ secrets.REDHAT_PASSWORD }}
+          GCR_USERNAME: ${{ secrets.GCR_USERNAME }}
+          GCR_PASSWORD: ${{ secrets.GCR_PASSWORD }}
+          ECR_USERNAME: ${{ secrets.ECR_USERNAME }}
+          ECR_PASSWORD: ${{ secrets.ECR_PASSWORD }}
+          AZURE_USERNAME: ${{ secrets.AZURE_USERNAME }}
+          AZURE_PASSWORD: ${{ secrets.AZURE_PASSWORD }}
+
+          # Dynamic registry credentials (customers add as needed)
+          REGISTRY_ACCESS_REDHAT_COM_USERNAME: ${{ secrets.REGISTRY_ACCESS_REDHAT_COM_USERNAME }}
+          REGISTRY_ACCESS_REDHAT_COM_PASSWORD: ${{ secrets.REGISTRY_ACCESS_REDHAT_COM_PASSWORD }}
+          QUAY_IO_USERNAME: ${{ secrets.QUAY_IO_USERNAME }}
+          QUAY_IO_PASSWORD: ${{ secrets.QUAY_IO_PASSWORD }}
+          COMPANY_AZURECR_IO_USERNAME: ${{ secrets.COMPANY_AZURECR_IO_USERNAME }}
+          COMPANY_AZURECR_IO_PASSWORD: ${{ secrets.COMPANY_AZURECR_IO_PASSWORD }}
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
