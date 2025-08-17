@@ -10,11 +10,26 @@ on:
         description: 'Tag to generate provenance for (e.g., container-v1.0.0)'
         required: true
         default: 'container-v1.0.0'
+      registry:
+        description: 'Container registry (ghcr.io, docker.io, etc.)'
+        required: false
+        default: 'ghcr.io'
+        type: string
+      dockerfile_path:
+        description: 'Path to Dockerfile (default: ./Dockerfile)'
+        required: false
+        default: './Dockerfile'
+        type: string
+      build_context:
+        description: 'Build context directory (default: .)'
+        required: false
+        default: '.'
+        type: string
 
 permissions: read-all
 
 env:
-  IMAGE_REGISTRY: ghcr.io
+  IMAGE_REGISTRY: ${{ github.event.inputs.registry || 'ghcr.io' }}
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
@@ -40,6 +55,22 @@ jobs:
           registry: ${{ env.IMAGE_REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+        if: env.IMAGE_REGISTRY == 'ghcr.io'
+
+      - name: Authenticate Docker (Docker Hub)
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+        if: env.IMAGE_REGISTRY == 'docker.io' || env.IMAGE_REGISTRY == 'index.docker.io'
+
+      - name: Authenticate Docker (Custom Registry)
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.IMAGE_REGISTRY }}
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+        if: env.IMAGE_REGISTRY != 'ghcr.io' && env.IMAGE_REGISTRY != 'docker.io' && env.IMAGE_REGISTRY != 'index.docker.io'
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
@@ -54,6 +85,8 @@ jobs:
         uses: docker/build-push-action@v6
         id: build
         with:
+          context: ${{ github.event.inputs.build_context || '.' }}
+          file: ${{ github.event.inputs.dockerfile_path || './Dockerfile' }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -91,5 +124,6 @@ jobs:
       image: ${{ needs.build.outputs.image }}
       digest: ${{ needs.build.outputs.digest }}
       registry-username: ${{ github.actor }}
+      private-repository: ${{ github.event.repository.private }}
     secrets:
       registry-password: ${{ secrets.GITHUB_TOKEN }}
