@@ -247,62 +247,101 @@ jobs:
             echo "✅ Composer installed: $(composer --version)"
           }
 
-          # Detect and install required tools
-          if echo "$BUILD_CMD" | grep -q "cargo"; then
-            if ! command_exists cargo; then
-              install_rust
-            else
-              echo "✅ Rust already available: $(cargo --version)"
-            fi
-          fi
+          # UNIVERSAL: Extract and install ALL missing commands
+          echo "🔍 Extracting commands from build command..."
 
-          if echo "$BUILD_CMD" | grep -q "zig"; then
-            if ! command_exists zig; then
-              install_zig
-            else
-              echo "✅ Zig already available: $(zig version)"
-            fi
-          fi
+          # Extract all commands from the build command
+          COMMANDS=$(echo "$BUILD_CMD" | grep -oE '\b[a-zA-Z][a-zA-Z0-9_-]*\b' | grep -v '^[0-9]*$' | sort -u)
+          echo "📋 Commands found: $COMMANDS"
 
-          if echo "$BUILD_CMD" | grep -q "mvn"; then
-            if ! command_exists mvn; then
-              install_maven
-            else
-              echo "✅ Maven already available: $(mvn --version | head -1)"
-            fi
-          fi
+          # Function to attempt universal installation
+          universal_install() {
+            local cmd="$1"
+            echo "🔧 Attempting to install: $cmd"
 
-          if echo "$BUILD_CMD" | grep -q "dotnet"; then
-            if ! command_exists dotnet; then
-              install_dotnet
-            else
-              echo "✅ .NET already available: $(dotnet --version)"
-            fi
-          fi
+            # Known installations (fast path)
+            case "$cmd" in
+              "cargo"|"rustc") install_rust ;;
+              "zig") install_zig ;;
+              "mvn") install_maven ;;
+              "dotnet") install_dotnet ;;
+              "cmake") install_cmake ;;
+              "gem") install_ruby ;;
+              "composer") install_php ;;
+              "go")
+                echo "🐹 Installing Go..."
+                sudo rm -rf /usr/local/go
+                wget -q https://go.dev/dl/go1.21.0.linux-amd64.tar.gz
+                sudo tar -C /usr/local -xzf go1.21.0.linux-amd64.tar.gz
+                echo "/usr/local/go/bin" >> $GITHUB_PATH
+                echo "✅ Go installed: $(/usr/local/go/bin/go version)"
+                ;;
+              "npm"|"node")
+                echo "📦 Installing Node.js/NPM..."
+                curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+                sudo apt-get install -y nodejs
+                echo "✅ Node.js installed: $(node --version)"
+                ;;
+              "pip"|"python3")
+                echo "🐍 Installing Python/pip..."
+                sudo apt-get update -q
+                sudo apt-get install -y python3 python3-pip
+                echo "✅ Python installed: $(python3 --version)"
+                ;;
+              "bazel")
+                echo "🏗️ Installing Bazel..."
+                curl -fsSL https://bazel.build/bazel-release.pub.gpg | gpg --dearmor > bazel.gpg
+                sudo mv bazel.gpg /etc/apt/trusted.gpg.d/
+                echo "deb [arch=amd64] https://storage.googleapis.com/bazel-apt stable jdk1.8" | sudo tee /etc/apt/sources.list.d/bazel.list
+                sudo apt-get update -q && sudo apt-get install -y bazel
+                echo "✅ Bazel installed: $(bazel --version)"
+                ;;
+              "ninja")
+                echo "🥷 Installing Ninja..."
+                sudo apt-get update -q && sudo apt-get install -y ninja-build
+                echo "✅ Ninja installed: $(ninja --version)"
+                ;;
+              "scons")
+                echo "🔨 Installing SCons..."
+                sudo apt-get update -q && sudo apt-get install -y scons
+                echo "✅ SCons installed: $(scons --version)"
+                ;;
+              "make")
+                echo "🔧 Installing Make..."
+                sudo apt-get update -q && sudo apt-get install -y build-essential
+                echo "✅ Make installed: $(make --version | head -1)"
+                ;;
+              *)
+                # Universal fallback: try apt, snap, or warn
+                echo "🌍 Attempting universal installation for: $cmd"
+                if sudo apt-get update -q && sudo apt-get install -y "$cmd" 2>/dev/null; then
+                  echo "✅ $cmd installed via apt"
+                elif sudo snap install "$cmd" 2>/dev/null; then
+                  echo "✅ $cmd installed via snap"
+                else
+                  echo "⚠️ Could not auto-install $cmd - build may fail"
+                  echo "💡 Consider adding manual installation for $cmd"
+                fi
+                ;;
+            esac
+          }
 
-          if echo "$BUILD_CMD" | grep -q "cmake"; then
-            if ! command_exists cmake; then
-              install_cmake
-            else
-              echo "✅ CMake already available: $(cmake --version | head -1)"
-            fi
-          fi
-
-          if echo "$BUILD_CMD" | grep -q "gem build"; then
-            if ! command_exists gem; then
-              install_ruby
-            else
-              echo "✅ Ruby already available: $(ruby --version)"
-            fi
-          fi
-
-          if echo "$BUILD_CMD" | grep -q "composer"; then
-            if ! command_exists composer; then
-              install_php
-            else
-              echo "✅ PHP/Composer already available: $(composer --version)"
-            fi
-          fi
+          # Check and install each command
+          for cmd in $COMMANDS; do
+            # Skip common shell keywords and operators
+            case "$cmd" in
+              "if"|"then"|"else"|"fi"|"for"|"do"|"done"|"while"|"case"|"esac"|"function"|"return"|"exit"|"echo"|"cd"|"ls"|"mkdir"|"rm"|"cp"|"mv"|"cat"|"grep"|"sed"|"awk"|"sort"|"uniq"|"head"|"tail"|"wc"|"find"|"xargs"|"tar"|"gzip"|"gunzip"|"wget"|"curl"|"git"|"sudo"|"apt"|"snap"|"pip"|"install"|"build"|"clean"|"test"|"run"|"exec"|"sh"|"bash"|"zsh"|"fish"|"and"|"or"|"not"|"true"|"false"|"yes"|"no")
+                echo "⏭️ Skipping shell keyword: $cmd"
+                ;;
+              *)
+                if ! command_exists "$cmd"; then
+                  universal_install "$cmd"
+                else
+                  echo "✅ $cmd already available: $(command -v $cmd)"
+                fi
+                ;;
+            esac
+          done
 
           echo "🎯 Dependency installation complete!"
 
