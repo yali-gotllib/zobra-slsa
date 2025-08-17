@@ -243,10 +243,10 @@ jobs:
     with:
       image: ${{ github.event.inputs.registry }}/${{ github.event.inputs.image_name || github.repository }}
       digest: ${{ needs.build.outputs.digest }}
-      registry-username: ${{ secrets.REGISTRY_USERNAME }}
       private-repository: ${{ github.event.repository.private }}
       compile-generator: true
     secrets:
+      registry-username: ${{ secrets.REGISTRY_USERNAME }}
       registry-password: ${{ secrets.REGISTRY_PASSWORD }}
 
   # Fix Docker Hub attestation upload
@@ -309,10 +309,10 @@ jobs:
     with:
       image: ${{ github.event.inputs.registry }}/${{ github.event.inputs.image_name || github.repository }}
       digest: ${{ needs.build.outputs.digest }}
-      registry-username: ${{ secrets.REGISTRY_USERNAME }}
       private-repository: ${{ github.event.repository.private }}
       compile-generator: true
     secrets:
+      registry-username: ${{ secrets.REGISTRY_USERNAME }}
       registry-password: ${{ secrets.REGISTRY_PASSWORD }}
 
 
