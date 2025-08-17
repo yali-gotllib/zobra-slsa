@@ -82,8 +82,8 @@ jobs:
           case "$ARTIFACT_TYPE" in
             "go")
               echo "setup_command=echo 'Setting up Go...'" >> "$GITHUB_OUTPUT"
-              echo "build_command=go build -o zobra-go-linux-amd64 main.go && GOOS=darwin GOARCH=amd64 go build -o zobra-go-darwin-amd64 main.go && GOOS=windows GOARCH=amd64 go build -o zobra-go-windows-amd64.exe main.go" >> "$GITHUB_OUTPUT"
-              echo "artifact_pattern=zobra-go-*" >> "$GITHUB_OUTPUT"
+              echo "build_command=go build -o zobra-slsa-linux-amd64 . && GOOS=darwin GOARCH=amd64 go build -o zobra-slsa-darwin-amd64 . && GOOS=windows GOARCH=amd64 go build -o zobra-slsa-windows-amd64.exe ." >> "$GITHUB_OUTPUT"
+              echo "artifact_pattern=zobra-slsa-*" >> "$GITHUB_OUTPUT"
               echo "artifact_path=." >> "$GITHUB_OUTPUT"
               ;;
             "python")
@@ -172,30 +172,54 @@ jobs:
           
           cd "${{ needs.detect.outputs.artifact_path }}"
           
-          # Check if any files match the pattern
-          if ! ls ${{ needs.detect.outputs.artifact_pattern }} >/dev/null 2>&1; then
+          # Find all files matching the pattern(s) - works for any artifact type
+          echo "🔍 Looking for artifacts matching: ${{ needs.detect.outputs.artifact_pattern }}"
+
+          # Use find to get only files (not directories) matching patterns
+          ARTIFACT_FILES=$(find . -maxdepth 1 -type f \( -name "${{ needs.detect.outputs.artifact_pattern }}" \) 2>/dev/null || true)
+
+          # If no files found with simple pattern, try expanding multiple patterns
+          if [ -z "$ARTIFACT_FILES" ]; then
+            echo "🔄 Trying expanded pattern matching..."
+            ARTIFACT_FILES=""
+            for pattern in ${{ needs.detect.outputs.artifact_pattern }}; do
+              FILES=$(find . -maxdepth 1 -type f -name "$pattern" 2>/dev/null || true)
+              if [ -n "$FILES" ]; then
+                ARTIFACT_FILES="$ARTIFACT_FILES $FILES"
+              fi
+            done
+          fi
+
+          # Remove leading ./ and extra spaces
+          ARTIFACT_FILES=$(echo $ARTIFACT_FILES | sed 's|./||g' | tr -s ' ')
+
+          if [ -z "$ARTIFACT_FILES" ]; then
             echo "❌ No artifacts found matching pattern: ${{ needs.detect.outputs.artifact_pattern }}"
             echo "📁 Contents of ${{ needs.detect.outputs.artifact_path }}:"
             ls -la
+            echo "🔍 All files in directory:"
+            find . -type f -maxdepth 2
             exit 1
           fi
-          
-          echo "📋 Generating hashes for:"
-          ls -la ${{ needs.detect.outputs.artifact_pattern }}
-          
+
+          echo "📋 Found artifacts:"
+          for file in $ARTIFACT_FILES; do
+            ls -la "$file"
+          done
+
           # Generate base64-encoded hashes as required by SLSA
-          echo "hashes=$(sha256sum ${{ needs.detect.outputs.artifact_pattern }} | base64 -w0)" >> "$GITHUB_OUTPUT"
-          
+          echo "hashes=$(sha256sum $ARTIFACT_FILES | base64 -w0)" >> "$GITHUB_OUTPUT"
+
           echo "✅ Hash generation complete"
           echo "📊 Generated hashes:"
-          sha256sum ${{ needs.detect.outputs.artifact_pattern }}
+          sha256sum $ARTIFACT_FILES
 
       # Upload artifacts for later verification
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: generic-slsa-artifacts-${{ needs.detect.outputs.artifact_type }}
-          path: ${{ needs.detect.outputs.artifact_path }}/${{ needs.detect.outputs.artifact_pattern }}
+          path: ${{ needs.detect.outputs.artifact_path }}
 
   # Generate SLSA provenance using the official generic generator
   provenance:
