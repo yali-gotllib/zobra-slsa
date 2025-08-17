@@ -51,6 +51,8 @@ jobs:
     outputs:
       image: ${{ steps.image.outputs.image }}
       digest: ${{ steps.digest.outputs.digest }}
+      registry_username: ${{ steps.registry-creds.outputs.username }}
+      registry_password_secret: ${{ steps.registry-creds.outputs.password_secret }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout the repository
@@ -239,6 +241,46 @@ jobs:
           digest=$(crane digest "$tag")
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
 
+      - name: Determine Registry Credentials for Provenance
+        id: registry-creds
+        run: |
+          set -euo pipefail
+          echo "🔐 Determining registry credentials for SLSA provenance..."
+
+          REGISTRY="${{ env.IMAGE_REGISTRY }}"
+
+          case "$REGISTRY" in
+            "ghcr.io")
+              echo "🐙 Using GitHub Container Registry credentials"
+              echo "username=${{ github.actor }}" >> "$GITHUB_OUTPUT"
+              echo "password_secret=GITHUB_TOKEN" >> "$GITHUB_OUTPUT"
+              ;;
+            "docker.io"|"index.docker.io"|"")
+              echo "🐳 Using Docker Hub credentials"
+              DOCKER_USER="${{ secrets.DOCKER_USERNAME }}"
+              if [ -n "$DOCKER_USER" ]; then
+                echo "username=$DOCKER_USER" >> "$GITHUB_OUTPUT"
+                echo "password_secret=DOCKER_PASSWORD" >> "$GITHUB_OUTPUT"
+              else
+                echo "❌ Error: DOCKER_USERNAME secret not configured for Docker Hub"
+                exit 1
+              fi
+              ;;
+            *)
+              echo "🏢 Using custom registry credentials"
+              REGISTRY_USER="${{ secrets.REGISTRY_USERNAME }}"
+              if [ -n "$REGISTRY_USER" ]; then
+                echo "username=$REGISTRY_USER" >> "$GITHUB_OUTPUT"
+                echo "password_secret=REGISTRY_PASSWORD" >> "$GITHUB_OUTPUT"
+              else
+                echo "❌ Error: REGISTRY_USERNAME secret not configured for $REGISTRY"
+                exit 1
+              fi
+              ;;
+          esac
+
+          echo "✅ Registry credentials determined for provenance"
+
       - name: Output image
         id: image
         run: |
@@ -260,7 +302,7 @@ jobs:
     with:
       image: ${{ needs.build.outputs.image }}
       digest: ${{ needs.build.outputs.digest }}
-      registry-username: ${{ github.actor }}
+      registry-username: ${{ needs.build.outputs.registry_username }}
       private-repository: ${{ github.event.repository.private }}
     secrets:
-      registry-password: ${{ secrets.GITHUB_TOKEN }}
+      registry-password: ${{ secrets[needs.build.outputs.registry_password_secret] }}
