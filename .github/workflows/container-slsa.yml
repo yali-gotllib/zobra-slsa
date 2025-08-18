@@ -117,32 +117,48 @@ jobs:
 
 
 
-      - name: Universal Registry Authentication
+      - name: Registry-Specific Authentication
         run: |
           set -euo pipefail
-          echo "Setting up universal registry authentication..."
-          
+          echo "Setting up registry-specific authentication..."
+
           REGISTRY="${{ env.IMAGE_REGISTRY }}"
-          
+
           if [ "$REGISTRY" = "ghcr.io" ]; then
             # GitHub Container Registry uses GitHub token
             echo "Authenticating to GitHub Container Registry..."
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io --username "${{ github.actor }}" --password-stdin
+
+          elif [ "$REGISTRY" = "gcr.io" ]; then
+            # Google Container Registry uses service account
+            echo "Authenticating to Google Container Registry..."
+            echo "Using GCR service account authentication"
+
+            if [ -z "${{ secrets.GCR_SA_KEY }}" ]; then
+              echo "Error: GCR_SA_KEY secret must be configured for Google Container Registry"
+              echo "This should contain the service account JSON key (not base64-encoded)"
+              echo "Alternative: Use REGISTRY_USERNAME=_json_key and REGISTRY_PASSWORD=<service-account-json>"
+              exit 1
+            fi
+
+            # Use service account key directly
+            echo "${{ secrets.GCR_SA_KEY }}" | docker login gcr.io --username _json_key --password-stdin
+
           else
-            # ALL other registries use the universal pattern
+            # Docker Hub and other registries use universal pattern
             echo "Authenticating to $REGISTRY using universal credentials..."
             echo "Using REGISTRY_USERNAME and REGISTRY_PASSWORD secrets"
-            
+
             if [ -z "${{ secrets.REGISTRY_USERNAME }}" ] || [ -z "${{ secrets.REGISTRY_PASSWORD }}" ]; then
               echo "Error: REGISTRY_USERNAME and REGISTRY_PASSWORD secrets must be configured"
-              echo "These secrets work for ANY registry: docker.io, quay.io, ECR, ACR, etc."
+              echo "These secrets work for: docker.io, ECR, ACR, and most other registries"
               exit 1
             fi
 
             echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login "$REGISTRY" --username "${{ secrets.REGISTRY_USERNAME }}" --password-stdin
           fi
-          
-          echo "Universal registry authentication complete"
+
+          echo "Registry authentication complete"
 
       - name: Extract metadata
         id: meta
@@ -297,7 +313,7 @@ jobs:
             echo "🔗 Build verification: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           fi
 
-  # Generate SLSA provenance for Google Container Registry (official pattern)
+  # Generate SLSA provenance for Google Container Registry (GCR-specific pattern)
   provenance-gcr:
     needs: [build]
     permissions:
@@ -312,7 +328,7 @@ jobs:
       private-repository: ${{ github.event.repository.private }}
       compile-generator: true
     secrets:
-      registry-username: ${{ secrets.REGISTRY_USERNAME }}
-      registry-password: ${{ secrets.REGISTRY_PASSWORD }}
+      registry-username: _json_key
+      registry-password: ${{ secrets.GCR_SA_KEY }}
 
 
