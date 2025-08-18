@@ -136,6 +136,7 @@ image_name: myapp
 4. **Provenance Generation** - Creates SLSA Level 3 attestation with `compile-generator: true` for non-GitHub registries
 5. **Attestation Upload** - Uploads provenance to registry (verified working for Docker Hub)
 6. **Diagnostic Check** - Verifies attestation was successfully uploaded
+7. **Verification Output** - Provides ready-to-use verification command in build logs
 
 ### **Example Usage**
 
@@ -185,6 +186,45 @@ rm sa-key.json
 
 # Run manually via GitHub Actions UI
 # Choose 'gcr.io' registry and image name like 'your-project-id/your-app'
+```
+
+### **Verifying SLSA Provenance After Workflow Completion**
+
+After the workflow completes successfully, you can verify the SLSA provenance:
+
+#### **Step 1: Get Verification Command from Workflow Logs**
+1. Go to your completed workflow run in GitHub Actions
+2. Click on the **"build"** job
+3. Look for the **"Output image and digest"** step
+4. Copy the verification command that looks like:
+```bash
+🔍 VERIFICATION COMMAND:
+slsa-verifier verify-image registry.com/username/app@sha256:abc123... \
+  --source-uri github.com/username/repo \
+  --source-branch main
+```
+
+#### **Step 2: Install slsa-verifier**
+```bash
+# Install the official SLSA verification tool
+go install github.com/slsa-framework/slsa-verifier/v2/cli/slsa-verifier@latest
+```
+
+#### **Step 3: Run Verification**
+```bash
+# Use the exact command from the workflow logs
+slsa-verifier verify-image your-registry.com/username/app@sha256:digest \
+  --source-uri github.com/username/repo \
+  --source-branch main
+```
+
+#### **Expected Success Output:**
+```
+✓ Verified signature against tlog entry index XXXXXXX
+✓ Verified build using builder "https://github.com/slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@refs/tags/v2.1.0"
+✓ Verified container image built from "github.com/username/repo@refs/heads/main"
+
+PASSED: SLSA verification passed
 ```
 
 ## 🔐 Security Features

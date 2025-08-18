@@ -134,15 +134,20 @@ jobs:
             echo "Authenticating to Google Container Registry..."
             echo "Using GCR service account authentication"
 
-            if [ -z "${{ secrets.GCR_SA_KEY }}" ]; then
+            # Create temporary file for service account key to handle multi-line JSON properly
+            SA_KEY_FILE=$(mktemp)
+            echo '${{ secrets.GCR_SA_KEY }}' > "$SA_KEY_FILE"
+
+            if [ ! -s "$SA_KEY_FILE" ]; then
               echo "Error: GCR_SA_KEY secret must be configured for Google Container Registry"
               echo "This should contain the service account JSON key (not base64-encoded)"
-              echo "Alternative: Use REGISTRY_USERNAME=_json_key and REGISTRY_PASSWORD=<service-account-json>"
+              rm -f "$SA_KEY_FILE"
               exit 1
             fi
 
-            # Use service account key directly
-            echo "${{ secrets.GCR_SA_KEY }}" | docker login gcr.io --username _json_key --password-stdin
+            # Use service account key file for authentication
+            cat "$SA_KEY_FILE" | docker login gcr.io --username _json_key --password-stdin
+            rm -f "$SA_KEY_FILE"
 
           else
             # Docker Hub and other registries use universal pattern
@@ -220,12 +225,19 @@ jobs:
 
 
 
-      - name: Output image
+      - name: Output image and digest
         id: image
         run: |
-          # Set the image as an output
+          # Set the image and digest as outputs
           image_name="${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}"
+          digest="${{ steps.digest.outputs.digest }}"
           echo "image=$image_name" >> "$GITHUB_OUTPUT"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          echo ""
+          echo "🔍 VERIFICATION COMMAND:"
+          echo "slsa-verifier verify-image $image_name@$digest \\"
+          echo "  --source-uri github.com/${{ github.repository }} \\"
+          echo "  --source-branch ${{ github.ref_name }}"
           echo "DEBUG: Final image name = $image_name"
 
 
@@ -330,5 +342,3 @@ jobs:
     secrets:
       registry-username: _json_key
       registry-password: ${{ secrets.GCR_SA_KEY }}
-
-

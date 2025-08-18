@@ -33,13 +33,21 @@ winget install --id GitHub.cli
 
 ### **Universal Artifact Workflow Verification**
 
-#### **1. Find the Correct Digest**
+#### **1. Get Verification Command from Workflow (Easiest)**
 ```bash
-# For container images, get the digest from the workflow diagnostic job
-# Look for: "🔍 Checking attestation for: IMAGE@sha256:..."
-# This shows the exact digest that has the SLSA attestation
+# The workflow automatically generates the verification command for you!
+# 1. Go to your completed workflow run in GitHub Actions
+# 2. Click on the "build" job
+# 3. Look for the "Output image and digest" step
+# 4. Copy the ready-to-use verification command:
 
-# Alternative: Check the workflow "Extract digest" step in build job
+🔍 VERIFICATION COMMAND:
+slsa-verifier verify-image registry.com/username/app@sha256:abc123... \
+  --source-uri github.com/username/repo \
+  --source-branch main
+
+# Alternative: Find digest manually from diagnostic job logs
+# Look for: "🔍 Checking attestation for: IMAGE@sha256:..."
 ```
 
 #### **2. Verify with slsa-verifier**
