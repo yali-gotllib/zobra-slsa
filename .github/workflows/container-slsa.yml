@@ -272,8 +272,8 @@ jobs:
       registry-username: ${{ secrets.REGISTRY_USERNAME }}
       registry-password: ${{ secrets.REGISTRY_PASSWORD }}
 
-  # Fix Docker Hub attestation upload
-  fix-docker-attestation:
+  # Verify Docker Hub attestation upload
+  verify-docker-attestation:
     needs: [build, provenance-docker]
     runs-on: ubuntu-latest
     permissions:
@@ -285,7 +285,7 @@ jobs:
       - name: Install Cosign
         uses: sigstore/cosign-installer@v3.4.0
 
-      - name: Check and Fix Docker Hub Attestation
+      - name: Verify Docker Hub Attestation Upload
         run: |
           IMAGE="${{ github.event.inputs.registry }}/${{ github.event.inputs.image_name || github.repository }}"
           DIGEST="${{ needs.build.outputs.digest }}"
