@@ -58,6 +58,7 @@ jobs:
       contents: read
       packages: write
     outputs:
+      # Image name is public information, not a secret
       image: ${{ steps.image.outputs.image }}
       digest: ${{ steps.digest.outputs.digest }}
     runs-on: ubuntu-latest
