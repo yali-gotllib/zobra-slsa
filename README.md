@@ -54,10 +54,53 @@ cp .github/workflows/container-slsa.yml your-repo/.github/workflows/
 - Run manually via GitHub Actions UI
 - Choose registry and image name
 
+### 4. Verify SLSA Provenance
+
+After your workflow completes successfully, verify the SLSA provenance to ensure supply chain security:
+
+#### **For Container Images:**
+
+1. **Get verification command from workflow logs:**
+   ```bash
+   # Go to: Workflow Run → "build" job → "Output image and digest" step
+   # Copy the auto-generated command that looks like:
+   slsa-verifier verify-image registry.com/username/app@sha256:digest \
+     --source-uri github.com/username/repo \
+     --source-branch main
+   ```
+
+2. **Install slsa-verifier:**
+   ```bash
+   go install github.com/slsa-framework/slsa-verifier/v2/cli/slsa-verifier@latest
+   ```
+
+3. **Run verification:**
+   ```bash
+   # Paste and run the command from step 1
+   # Expected output: "PASSED: SLSA verification passed"
+   ```
+
+#### **For Artifacts:**
+
+1. **Download artifacts from GitHub release:**
+   ```bash
+   gh release download v1.0.0 --repo your-org/your-repo
+   ```
+
+2. **Verify with slsa-verifier:**
+   ```bash
+   slsa-verifier verify-artifact your-artifact.tar.gz \
+     --provenance-path your-artifact.tar.gz.intoto.jsonl \
+     --source-uri github.com/your-org/your-repo \
+     --source-tag v1.0.0
+   ```
+
+**For detailed verification instructions and troubleshooting, see [VERIFICATION.md](VERIFICATION.md).**
+
 ## 📚 Documentation
 
 - **[WORKFLOWS.md](WORKFLOWS.md)** - Complete workflow documentation and configuration
-- **[VERIFICATION.md](VERIFICATION.md)** - How to verify SLSA provenance with slsa-verifier
+- **[VERIFICATION.md](VERIFICATION.md)** - Detailed verification guide with examples and troubleshooting
 
 ## 🌟 Key Features
 
