@@ -59,14 +59,10 @@ Generates SLSA Level 3 provenance for container images with support for major co
 
 ### **Supported Registries**
 
-#### **Tier 1: Full SLSA Support (Verified Working)**
+#### **Supported Registries (Full SLSA Support)**
 - **GitHub Container Registry (ghcr.io)** - Native GitHub integration, works out-of-the-box
 - **Docker Hub (docker.io)** - ✅ **CONFIRMED WORKING** with `compile-generator: true` parameter
-- **Google Container Registry (gcr.io)** - Google Cloud Platform, uses same pattern as Docker Hub
-
-#### **Tier 2: Cloud Provider Registries (Expected to Work)**
-- **Amazon ECR** - AWS container registry, uses universal credential pattern
-- **Azure Container Registry** - Microsoft Azure registry, uses universal credential pattern
+- **Google Container Registry (gcr.io)** - Google Cloud Platform, service account authentication
 
 ### **Configuration**
 
@@ -84,11 +80,7 @@ REGISTRY_PASSWORD=your-docker-password-or-token
 GCR_SA_KEY=<service-account-json-content>
 ```
 
-**Other Registries (ECR, ACR, etc.):**
-```bash
-REGISTRY_USERNAME=your-username
-REGISTRY_PASSWORD=your-password-or-token
-```
+
 
 #### **Registry-Specific Examples**
 

@@ -13,10 +13,10 @@ This repository provides **production-ready workflows** that generate authentic 
 - **Works universally** across all languages and frameworks
 
 ### **✅ Professional Container Workflow**
-- **Verified working** with GitHub Container Registry and Docker Hub
+- **Verified working** with GitHub Container Registry, Docker Hub, and Google Container Registry
 - **Registry-specific authentication** with proven SLSA attestation upload
-- **Universal credential patterns** for major container registries
 - **Production-ready** reliability with diagnostic verification
+- **Auto-generated verification commands** for easy SLSA provenance verification
 
 ## 🚀 Quick Start
 
@@ -64,7 +64,7 @@ cp .github/workflows/container-slsa.yml your-repo/.github/workflows/
 ### **Universal Compatibility**
 - **Any programming language** - Go, Python, Node.js, Rust, Java, C#, etc.
 - **Any artifact type** - Binaries, packages, libraries, executables
-- **Major container registries** - GitHub Container Registry ✅, Docker Hub ✅, Google Container Registry, Amazon ECR, Azure Container Registry
+- **Major container registries** - GitHub Container Registry ✅, Docker Hub ✅, Google Container Registry ✅
 
 ### **Professional Quality**
 - **Official SLSA framework** - Uses `slsa-framework/slsa-github-generator`

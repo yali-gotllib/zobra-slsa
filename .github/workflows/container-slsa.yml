@@ -12,7 +12,7 @@ on:
         required: true
         default: 'container-v1.0.0'
       registry:
-        description: 'Container registry (ghcr.io, docker.io, gcr.io, ECR, ACR)'
+        description: 'Container registry (verified SLSA support: ghcr.io, docker.io, gcr.io)'
         required: false
         default: 'ghcr.io'
         type: choice
@@ -84,21 +84,15 @@ jobs:
             "gcr.io"|"*.gcr.io")
               echo "✅ Google Container Registry - SLSA supported"
               ;;
-            "*.dkr.ecr.*.amazonaws.com")
-              echo "✅ Amazon ECR - Cloud provider registry"
-              ;;
-            "*.azurecr.io")
-              echo "✅ Azure Container Registry - Cloud provider registry"
-              ;;
             *)
               if [[ "${{ github.event.inputs.registry }}" == "custom" ]]; then
                 echo "⚠️  Custom registry: $REGISTRY"
                 echo "⚠️  SLSA provenance compatibility not guaranteed"
-                echo "⚠️  Supported registries: ghcr.io, docker.io, gcr.io, ECR, ACR"
+                echo "⚠️  Supported registries: ghcr.io, docker.io, gcr.io"
               else
                 echo "❌ Unsupported registry: $REGISTRY"
                 echo "❌ This workflow supports proven SLSA-compatible registries only"
-                echo "✅ Supported: ghcr.io, docker.io, gcr.io, ECR, ACR"
+                echo "✅ Supported: ghcr.io, docker.io, gcr.io"
                 echo "💡 Use 'custom' option for experimental registries"
                 exit 1
               fi
@@ -156,7 +150,7 @@ jobs:
 
             if [ -z "${{ secrets.REGISTRY_USERNAME }}" ] || [ -z "${{ secrets.REGISTRY_PASSWORD }}" ]; then
               echo "Error: REGISTRY_USERNAME and REGISTRY_PASSWORD secrets must be configured"
-              echo "These secrets work for: docker.io, ECR, ACR, and most other registries"
+              echo "These secrets work for: docker.io and most other registries"
               exit 1
             fi
 
