@@ -120,11 +120,17 @@ slsa-verifier verify-image ghcr.io/username/myapp:v1.0.0 \
   --source-tag v1.0.0
 ```
 
-**Google Container Registry:**
+**Google Container Registry:** ✅ **SUPPORTED**
 ```bash
-slsa-verifier verify-image gcr.io/project-id/myapp:v1.0.0 \
+# Use the digest from the workflow diagnostic job
+slsa-verifier verify-image gcr.io/project-id/myapp@sha256:abc123... \
   --source-uri github.com/username/myapp \
-  --source-tag v1.0.0
+  --source-branch main
+
+# Example for Google Artifact Registry (GAR)
+slsa-verifier verify-image us-central1-docker.pkg.dev/project-id/repo-name/myapp@sha256:abc123... \
+  --source-uri github.com/username/myapp \
+  --source-branch main
 ```
 
 #### **3. Expected Output**

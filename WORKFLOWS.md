@@ -73,8 +73,19 @@ Generates SLSA Level 3 provenance for container images with support for major co
 #### **Secrets Setup**
 For non-GitHub registries, configure these repository secrets:
 
+**Docker Hub:**
 ```bash
-# Required for docker.io, gcr.io, ECR, ACR
+REGISTRY_USERNAME=your-docker-username
+REGISTRY_PASSWORD=your-docker-password-or-token
+```
+
+**Google Container Registry (GCR) or Google Artifact Registry (GAR):**
+```bash
+GCR_SA_KEY=<service-account-json-content>
+```
+
+**Other Registries (ECR, ACR, etc.):**
+```bash
 REGISTRY_USERNAME=your-username
 REGISTRY_PASSWORD=your-password-or-token
 ```
@@ -93,7 +104,8 @@ image_name: username/myapp
 ```yaml
 registry: gcr.io
 image_name: project-id/myapp
-# Secrets: REGISTRY_USERNAME=_json_key, REGISTRY_PASSWORD=<service-account-json>
+# Secrets: GCR_SA_KEY=<service-account-json>
+# Note: Uses _json_key authentication with service account
 ```
 
 **Amazon ECR:**
@@ -126,16 +138,53 @@ image_name: myapp
 6. **Diagnostic Check** - Verifies attestation was successfully uploaded
 
 ### **Example Usage**
+
+#### **Docker Hub Setup:**
 ```bash
-# Copy to your repository
+# Copy workflow to your repository
 cp .github/workflows/container-slsa.yml your-repo/.github/workflows/
 
-# Configure secrets (for non-GitHub registries)
-gh secret set REGISTRY_USERNAME --body "your-username"
-gh secret set REGISTRY_PASSWORD --body "your-password"
+# Configure Docker Hub secrets
+gh secret set REGISTRY_USERNAME --body "your-docker-username"
+gh secret set REGISTRY_PASSWORD --body "your-docker-password"
 
 # Run manually via GitHub Actions UI
-# Choose registry and image name
+# Choose 'docker.io' registry and your image name
+```
+
+#### **Google Container Registry Setup:**
+```bash
+# 1. Create service account with minimal permissions
+gcloud iam service-accounts create slsa-container-builder \
+  --description="SLSA container provenance builder" \
+  --display-name="SLSA Container Builder"
+
+# 2. Grant minimal required permissions
+PROJECT_ID="your-project-id"
+SA_EMAIL="slsa-container-builder@${PROJECT_ID}.iam.gserviceaccount.com"
+
+# For Google Container Registry (gcr.io)
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+  --member="serviceAccount:${SA_EMAIL}" \
+  --role="roles/storage.admin"
+
+# For Google Artifact Registry (GAR) - use this instead of storage.admin
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+  --member="serviceAccount:${SA_EMAIL}" \
+  --role="roles/artifactregistry.writer"
+
+# 3. Create and download service account key
+gcloud iam service-accounts keys create sa-key.json \
+  --iam-account="${SA_EMAIL}"
+
+# 4. Add service account key to GitHub secrets
+gh secret set GCR_SA_KEY --body "$(cat sa-key.json)"
+
+# 5. Clean up local key file
+rm sa-key.json
+
+# Run manually via GitHub Actions UI
+# Choose 'gcr.io' registry and image name like 'your-project-id/your-app'
 ```
 
 ## 🔐 Security Features
@@ -157,6 +206,41 @@ All generated provenance can be verified using:
 - **Public transparency logs** - All attestations recorded in Rekor
 - **Audit trail** - Complete build process documentation
 - **Source verification** - Links artifacts to source repository
+
+## 🔐 Google Cloud Permissions
+
+### **Minimal Required Permissions**
+
+#### **For Google Container Registry (gcr.io):**
+- **`roles/storage.admin`** - Required for pushing images and attestations to GCS buckets that back GCR
+
+#### **For Google Artifact Registry (GAR):**
+- **`roles/artifactregistry.writer`** - More granular permission for GAR repositories
+- **Alternative**: `roles/artifactregistry.repoAdmin` for full repository management
+
+### **Permission Comparison:**
+```bash
+# Option 1: Google Container Registry (gcr.io) - Legacy
+roles/storage.admin
+  - storage.buckets.get
+  - storage.objects.create
+  - storage.objects.delete
+  - storage.objects.get
+  - storage.objects.list
+
+# Option 2: Google Artifact Registry (GAR) - Recommended
+roles/artifactregistry.writer
+  - artifactregistry.repositories.downloadArtifacts
+  - artifactregistry.repositories.uploadArtifacts
+  - artifactregistry.repositories.get
+  - artifactregistry.repositories.list
+```
+
+### **Security Best Practices:**
+- **Use GAR over GCR** - More granular permissions and better security
+- **Limit service account scope** - Only grant permissions to specific repositories if possible
+- **Rotate service account keys** - Regularly rotate keys for security
+- **Use Workload Identity** - Consider Workload Identity Federation for keyless authentication (advanced)
 
 ## 🛠️ Advanced Configuration
 

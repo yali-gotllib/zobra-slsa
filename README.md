@@ -34,9 +34,15 @@ cp .github/workflows/container-slsa.yml your-repo/.github/workflows/
 
 ### 2. Configure Secrets (Container Workflow Only)
 
-For non-GitHub registries, add these secrets to your repository:
-- `REGISTRY_USERNAME` - Your registry username
-- `REGISTRY_PASSWORD` - Your registry password/token
+**For Docker Hub:**
+- `REGISTRY_USERNAME` - Your Docker Hub username
+- `REGISTRY_PASSWORD` - Your Docker Hub password/token
+
+**For Google Container Registry/Artifact Registry:**
+- `GCR_SA_KEY` - Service account JSON key content
+
+**For GitHub Container Registry:**
+- No additional secrets needed (uses GITHUB_TOKEN)
 
 ### 3. Run the Workflow
 
